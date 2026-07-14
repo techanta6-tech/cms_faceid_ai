@@ -4,15 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "main": "main.cjs",
-  "main": "main.cjs",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "eslint . && tsc --noEmit",
-    "electron:dev": "electron .",
-    "electron:build": "vite build && electron-builder",
     "electron:dev": "electron .",
     "electron:build": "vite build && electron-builder"
   },

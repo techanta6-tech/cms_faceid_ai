@@ -79,7 +79,7 @@ Prisma.NullTypes = {
 
 
 
-const path = require('path')
+  const path = require('path')
 
 /**
  * Enums
@@ -1318,7 +1318,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "D:\\Anta6 Documents\\LCMS Anh Cường\\Source\\cms_faceid_cms\\apps\\backend\\generated\\lcms",
+      "value": "D:\\Anta6 Documents\\LCMS Anh Cường\\Source\\lovad_cms\\apps\\backend\\generated\\lcms",
       "fromEnvVar": null
     },
     "config": {
@@ -1336,7 +1336,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "D:\\Anta6 Documents\\LCMS Anh Cường\\Source\\cms_faceid_cms\\apps\\backend\\prisma\\lcms.prisma",
+    "sourceFilePath": "D:\\Anta6 Documents\\LCMS Anh Cường\\Source\\lovad_cms\\apps\\backend\\prisma\\lcms.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
@@ -1372,7 +1372,7 @@ if (!fs.existsSync(path.join(__dirname, 'schema.prisma'))) {
     "generated/lcms",
     "lcms",
   ]
-
+  
   const alternativePath = alternativePaths.find((altPath) => {
     return fs.existsSync(path.join(process.cwd(), altPath, 'schema.prisma'))
   }) ?? alternativePaths[0]
@@ -1389,8 +1389,8 @@ config.engineWasm = undefined
 const { warnEnvConflicts } = require('./runtime/library.js')
 
 warnEnvConflicts({
-  rootEnvPath: config.relativeEnvPaths.rootEnvPath && path.resolve(config.dirname, config.relativeEnvPaths.rootEnvPath),
-  schemaEnvPath: config.relativeEnvPaths.schemaEnvPath && path.resolve(config.dirname, config.relativeEnvPaths.schemaEnvPath)
+    rootEnvPath: config.relativeEnvPaths.rootEnvPath && path.resolve(config.dirname, config.relativeEnvPaths.rootEnvPath),
+    schemaEnvPath: config.relativeEnvPaths.schemaEnvPath && path.resolve(config.dirname, config.relativeEnvPaths.schemaEnvPath)
 })
 
 const PrismaClient = getPrismaClient(config)

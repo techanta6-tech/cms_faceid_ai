@@ -148,7 +148,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "D:\\Anta6 Documents\\LCMS Anh Cường\\Source\\cms_faceid_cms\\apps\\backend\\generated\\cms_webserver",
+      "value": "D:\\Anta6 Documents\\LCMS Anh Cường\\Source\\lovad_cms\\apps\\backend\\generated\\cms_webserver",
       "fromEnvVar": null
     },
     "config": {
@@ -166,7 +166,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "D:\\Anta6 Documents\\LCMS Anh Cường\\Source\\cms_faceid_cms\\apps\\backend\\prisma\\cms_webserver.prisma",
+    "sourceFilePath": "D:\\Anta6 Documents\\LCMS Anh Cường\\Source\\lovad_cms\\apps\\backend\\prisma\\cms_webserver.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, FormEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   List,
   TrendingUp,
@@ -57,7 +58,52 @@ const parseToLocalTime = (timeCreated?: string): string => {
   return d.toTimeString().split(' ')[0]; // "HH:mm:ss"
 };
 
+const timeStringToSeconds = (tStr: string): number => {
+  if (!tStr) return 0;
+  const parts = tStr.split(':').map(Number);
+  const h = parts[0] || 0;
+  const m = parts[1] || 0;
+  const s = parts[2] || 0;
+  return h * 3600 + m * 60 + s;
+};
+
+const getMeetingPhoto = (seed: string, isLoi: boolean, type: 'in' | 'out') => {
+  if (isLoi) {
+    if (type === 'in') {
+      return "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300&h=300";
+    } else {
+      return "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300&h=300";
+    }
+  }
+  const index = parseInt(seed.replace(/^\D+/g, '')) || 1;
+  const offset = type === 'in' ? 0 : 3;
+  const portraits = [
+    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300&h=300",
+    "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300&h=300",
+    "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=300&h=300",
+    "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=300&h=300",
+    "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=300&h=300",
+    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300&h=300",
+    "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=300&h=300",
+    "https://images.unsplash.com/photo-1504257486230-1699a27f01d9?auto=format&fit=crop&q=80&w=300&h=300"
+  ];
+  return portraits[(index + offset) % portraits.length];
+};
+
+const getPhotoSrc = (item: any, type: 'in' | 'out') => {
+  const event = type === 'in' ? item.emp.entryEvent : item.emp.exitEvent;
+  if (event?.cropped_face_images && event.cropped_face_images.length > 0) {
+    const img = event.cropped_face_images[0];
+    if (img) return img;
+  }
+  if (item.emp.originalObject?.anhDaiDien?.url) {
+    return item.emp.originalObject.anhDaiDien.url;
+  }
+  return getMeetingPhoto(item.emp.avatarSeed, item.emp.ma === "010203045567", type);
+};
+
 export const ReportPage = () => {
+  const location = useLocation();
   const { eventLogs, meetings, areasData, employees, isLoadingLogs, humanGroups } = useApp();
   const [flashActive, setFlashActive] = useState(false);
 
@@ -272,9 +318,254 @@ export const ReportPage = () => {
     attendance: any[];
   } | null>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
-  const [computedAttendeeRoster, setComputedAttendeeRoster] = useState([]);
+  const computedAttendeeRoster = useMemo(() => {
+    if (!selectedMeetingReport) return [];
+
+    const timeStringToSeconds = (tStr: string): number => {
+      if (!tStr) return 0;
+      const parts = tStr.split(':').map(Number);
+      const h = parts[0] || 0;
+      const m = parts[1] || 0;
+      const s = parts[2] || 0;
+      return h * 3600 + m * 60 + s;
+    };
+
+    const getMeetingPhoto = (seed: string, isLoi: boolean, type: 'in' | 'out') => {
+      if (isLoi) {
+        if (type === 'in') {
+          return "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300&h=300";
+        } else {
+          return "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300&h=300";
+        }
+      }
+      const index = parseInt(seed.replace(/^\D+/g, '')) || 1;
+      const offset = type === 'in' ? 0 : 3;
+      const portraits = [
+        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300&h=300",
+        "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300&h=300",
+        "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=300&h=300",
+        "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=300&h=300",
+        "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=300&h=300",
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300&h=300",
+        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=300&h=300",
+        "https://images.unsplash.com/photo-1504257486230-1699a27f01d9?auto=format&fit=crop&q=80&w=300&h=300"
+      ];
+      return portraits[(index + offset) % portraits.length];
+    };
+
+    const meetingStartSec = timeStringToSeconds(meetingStartTime);
+    const meetingEndSec = timeStringToSeconds(meetingEndTime);
+    const meetingDur = meetingEndSec - meetingStartSec || 3600;
+
+    const activeEmployees = employees.filter(emp => {
+      const matchesGroup = emp.human_group.some((g: string) => meetingGroups.includes(g));
+      const matchesSearch = !meetingSearchQuery
+        ? true
+        : emp.hoTen.toLowerCase().includes(meetingSearchQuery.toLowerCase()) ||
+          emp.maGiayTo.includes(meetingSearchQuery);
+      return matchesGroup && matchesSearch;
+    });
+
+    const attendeeRoster = activeEmployees.map(emp => {
+      let thoiGianVao: string | undefined = undefined;
+      let thoiGianRa: string | undefined = undefined;
+      let entryEvent: any = null;
+      let exitEvent: any = null;
+
+      if (meetingReportData) {
+        const match = meetingReportData.attendance.find((item: any) => item.employeeId === emp.id);
+        if (match) {
+          thoiGianVao = match.thoiGianVao || undefined;
+          thoiGianRa = match.thoiGianRa || undefined;
+          entryEvent = match.entryEvent || null;
+          exitEvent = match.exitEvent || null;
+        }
+      } else {
+        const empLogs = eventLogs.filter(log => {
+          if (log.ma !== emp.maGiayTo) return false;
+          if (!log.thoiGian) return false;
+          const [datePart] = log.thoiGian.split('-');
+          if (!datePart) return false;
+          const [day, month, year] = datePart.split('/');
+          const logDateStr = `${year}-${month}-${day}`;
+          return logDateStr === meetingDate;
+        });
+
+        const sortedEmpLogs = [...empLogs].sort((a, b) => {
+          const timeA = a.thoiGian ? a.thoiGian.split('-')[1] : '';
+          const timeB = b.thoiGian ? b.thoiGian.split('-')[1] : '';
+          return timeA.localeCompare(timeB);
+        });
+
+        if (sortedEmpLogs.length === 1) {
+          const log = sortedEmpLogs[0];
+          const timeStr = log.thoiGian ? log.thoiGian.split('-')[1] : '';
+          if (log.vung === 'Checkout Area') {
+            thoiGianRa = timeStr;
+          } else {
+            thoiGianVao = timeStr;
+          }
+        } else if (sortedEmpLogs.length >= 2) {
+          thoiGianVao = sortedEmpLogs[0].thoiGian ? sortedEmpLogs[0].thoiGian.split('-')[1] : '';
+          thoiGianRa = sortedEmpLogs[sortedEmpLogs.length - 1].thoiGian ? sortedEmpLogs[sortedEmpLogs.length - 1].thoiGian.split('-')[1] : '';
+        }
+      }
+
+      let evaluationText: string;
+      let evaluationType: 'good' | 'early' | 'absent' | 'manual';
+      let ratioPercent = 0;
+
+      if (!thoiGianVao && !thoiGianRa) {
+        evaluationText = "Vắng";
+        evaluationType = 'absent';
+      } else if (!thoiGianVao || !thoiGianRa) {
+        evaluationText = "Cần xử lý riêng";
+        evaluationType = 'manual';
+      } else {
+        const inSec = timeStringToSeconds(thoiGianVao);
+        const outSec = timeStringToSeconds(thoiGianRa);
+        const spentSec = outSec - inSec;
+        const ratio = Math.max(0, Math.min(100, Math.round((spentSec / meetingDur) * 100)));
+        ratioPercent = ratio;
+        if (ratio > 95) {
+          evaluationText = `${ratio}%, Hoàn thành tốt`;
+          evaluationType = 'good';
+        } else {
+          evaluationText = `${ratio}%, Rời phòng sớm`;
+          evaluationType = 'early';
+        }
+      }
+
+      let entryColorClass = 'text-white';
+      let entryBadgeClass = 'text-white bg-slate-800/40 border-slate-700/50';
+      let entryImageBorderClass = 'border-emerald-500/30';
+      let entryImageCornersClass = 'border-emerald-400';
+      let entryMatchBadgeClass = 'text-white border-emerald-500/20';
+
+      if (thoiGianVao) {
+        const inSec = timeStringToSeconds(thoiGianVao);
+        const latenessSec = inSec - meetingStartSec;
+        if (latenessSec > 0) {
+          if (latenessSec <= 900) {
+            entryColorClass = 'text-white';
+            entryBadgeClass = 'text-white bg-slate-800/40 border-slate-700/50';
+            entryImageBorderClass = 'border-emerald-500/30';
+            entryImageCornersClass = 'border-emerald-400';
+            entryMatchBadgeClass = 'text-white border-emerald-500/20';
+          } else if (latenessSec <= 1800) {
+            entryColorClass = 'text-amber-400';
+            entryBadgeClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+            entryImageBorderClass = 'border-emerald-500/30';
+            entryImageCornersClass = 'border-emerald-400';
+            entryMatchBadgeClass = 'text-white border-emerald-500/20';
+          } else {
+            entryColorClass = 'text-rose-500';
+            entryBadgeClass = 'text-rose-500 bg-rose-500/10 border-rose-500/20';
+            entryImageBorderClass = 'border-[#21232d]';
+            entryImageCornersClass = 'border-[#21232d]';
+            entryMatchBadgeClass = 'text-white border-emerald-500/20';
+          }
+        }
+      } else {
+        entryColorClass = 'text-slate-500';
+      }
+
+      let exitColorClass = 'text-white';
+      let exitBadgeClass = 'text-white bg-slate-800/40 border-slate-700/50';
+      let exitImageBorderClass = 'border-emerald-500/30';
+      let exitImageCornersClass = 'border-emerald-400';
+      let exitMatchBadgeClass = 'text-white border-emerald-500/20';
+
+      if (thoiGianRa) {
+        const outSec = timeStringToSeconds(thoiGianRa);
+        const earlinessSec = meetingEndSec - outSec;
+        if (earlinessSec > 0) {
+          if (earlinessSec <= 900) {
+            exitColorClass = 'text-white';
+            exitBadgeClass = 'text-white bg-slate-800/40 border-slate-700/50';
+            exitImageBorderClass = 'border-emerald-500/30';
+            exitImageCornersClass = 'border-emerald-400';
+            exitMatchBadgeClass = 'text-white border-emerald-500/20';
+          } else if (earlinessSec <= 1800) {
+            exitColorClass = 'text-amber-400';
+            exitBadgeClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+            exitImageBorderClass = 'border-emerald-500/30';
+            exitImageCornersClass = 'border-emerald-400';
+            exitMatchBadgeClass = 'text-white border-emerald-500/20';
+          } else {
+            exitColorClass = 'text-rose-500';
+            exitBadgeClass = 'text-rose-500 bg-rose-500/10 border-rose-500/20';
+            exitImageBorderClass = 'border-[#21232d]';
+            exitImageCornersClass = 'border-[#21232d]';
+            exitMatchBadgeClass = 'text-white border-emerald-500/20';
+          }
+        }
+      } else {
+        exitColorClass = 'text-slate-500';
+      }
+
+      let evaluationColorClass = 'text-emerald-400';
+      if (evaluationType === 'absent' || entryColorClass === 'text-rose-500' || exitColorClass === 'text-rose-500') {
+        evaluationColorClass = 'text-rose-500';
+      } else if (evaluationType === 'manual' || evaluationType === 'early' || entryColorClass === 'text-amber-400' || exitColorClass === 'text-amber-400') {
+        evaluationColorClass = 'text-amber-500';
+      }
+
+      const empShape = {
+        ma: emp.maGiayTo || emp.id,
+        ten: emp.hoTen,
+        danhSach: emp.human_group[0] || 'Mặc định',
+        avatarSeed: `avatar_${emp.id}`,
+        originalObject: emp,
+        entryEvent,
+        exitEvent
+      };
+
+      return {
+        emp: empShape,
+        thoiGianVao,
+        thoiGianRa,
+        evaluationText,
+        evaluationType,
+        ratioPercent,
+        entryColorClass,
+        entryBadgeClass,
+        entryImageBorderClass,
+        entryImageCornersClass,
+        entryMatchBadgeClass,
+        exitColorClass,
+        exitBadgeClass,
+        exitImageBorderClass,
+        exitImageCornersClass,
+        exitMatchBadgeClass,
+        evaluationColorClass
+      };
+    });
+
+    return [...attendeeRoster].sort((a, b) => {
+      const order = { good: 1, early: 2, manual: 3, absent: 4 };
+      return order[a.evaluationType] - order[b.evaluationType];
+    });
+  }, [
+    selectedMeetingReport,
+    meetingStartTime,
+    meetingEndTime,
+    employees,
+    meetingGroups,
+    meetingSearchQuery,
+    meetingReportData,
+    eventLogs,
+    meetingDate
+  ]);
   const [inImageIndex, setInImageIndex] = useState(0);
   const [outImageIndex, setOutImageIndex] = useState(0);
+
+  // Reset tabs and details when navigating via the left sidebar (even on the same route)
+  useEffect(() => {
+    setActiveTab('list');
+    setIsMeetingSearched(false);
+    setSelectedMeetingReport(null);
+  }, [location.key]);
 
   const [hasInitializedAreas, setHasInitializedAreas] = useState(false);
   useEffect(() => {
@@ -1768,250 +2059,7 @@ export const ReportPage = () => {
                         );
                       }
 
-                      const timeStringToSeconds = (tStr: string): number => {
-                        if (!tStr) return 0;
-                        const parts = tStr.split(':').map(Number);
-                        const h = parts[0] || 0;
-                        const m = parts[1] || 0;
-                        const s = parts[2] || 0;
-                        return h * 3600 + m * 60 + s;
-                      };
-
-                      const getMeetingPhoto = (seed: string, isLoi: boolean, type: 'in' | 'out') => {
-                        if (isLoi) {
-                          if (type === 'in') {
-                            return "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300&h=300";
-                          } else {
-                            return "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300&h=300";
-                          }
-                        }
-                        const index = parseInt(seed.replace(/^\D+/g, '')) || 1;
-                        const offset = type === 'in' ? 0 : 3;
-                        const portraits = [
-                          "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300&h=300",
-                          "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300&h=300",
-                          "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=300&h=300",
-                          "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=300&h=300",
-                          "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=300&h=300",
-                          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300&h=300",
-                          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=300&h=300",
-                          "https://images.unsplash.com/photo-1504257486230-1699a27f01d9?auto=format&fit=crop&q=80&w=300&h=300"
-                        ];
-                        return portraits[(index + offset) % portraits.length];
-                      };
-
-                      const getPhotoSrc = (item: any, type: 'in' | 'out') => {
-                        const event = type === 'in' ? item.emp.entryEvent : item.emp.exitEvent;
-                        if (event?.cropped_face_images && event.cropped_face_images.length > 0) {
-                          const img = event.cropped_face_images[0];
-                          if (img) return img;
-                        }
-                        if (item.emp.originalObject?.anhDaiDien?.url) {
-                          return item.emp.originalObject.anhDaiDien.url;
-                        }
-                        return getMeetingPhoto(item.emp.avatarSeed, item.emp.ma === "010203045567", type);
-                      };
-
-                      const meetingStartSec = timeStringToSeconds(meetingStartTime);
-                      const meetingEndSec = timeStringToSeconds(meetingEndTime);
-                      const meetingDur = meetingEndSec - meetingStartSec || 3600;
-
-                      // Filter based on selected meeting groups and search query
-                      const activeEmployees = employees.filter(emp => {
-                        const matchesGroup = emp.human_group.some((g: string) => meetingGroups.includes(g));
-                        const matchesSearch = !meetingSearchQuery
-                          ? true
-                          : emp.hoTen.toLowerCase().includes(meetingSearchQuery.toLowerCase()) ||
-                          emp.maGiayTo.includes(meetingSearchQuery);
-                        return matchesGroup && matchesSearch;
-                      });
-
-                      const attendeeRoster = activeEmployees.map(emp => {
-                        let thoiGianVao: string | undefined = undefined;
-                        let thoiGianRa: string | undefined = undefined;
-                        let entryEvent: any = null;
-                        let exitEvent: any = null;
-
-                        if (meetingReportData) {
-                          const match = meetingReportData.attendance.find((item: any) => item.employeeId === emp.id);
-                          if (match) {
-                            thoiGianVao = match.thoiGianVao || undefined;
-                            thoiGianRa = match.thoiGianRa || undefined;
-                            entryEvent = match.entryEvent || null;
-                            exitEvent = match.exitEvent || null;
-                          }
-                        } else {
-                          // Fallback to mock eventLogs logic
-                          const empLogs = eventLogs.filter(log => {
-                            if (log.ma !== emp.maGiayTo) return false;
-                            if (!log.thoiGian) return false;
-                            const [datePart] = log.thoiGian.split('-');
-                            if (!datePart) return false;
-                            const [day, month, year] = datePart.split('/');
-                            const logDateStr = `${year}-${month}-${day}`;
-                            return logDateStr === meetingDate;
-                          });
-
-                          const sortedEmpLogs = [...empLogs].sort((a, b) => {
-                            const timeA = a.thoiGian ? a.thoiGian.split('-')[1] : '';
-                            const timeB = b.thoiGian ? b.thoiGian.split('-')[1] : '';
-                            return timeA.localeCompare(timeB);
-                          });
-
-                          if (sortedEmpLogs.length === 1) {
-                            const log = sortedEmpLogs[0];
-                            const timeStr = log.thoiGian ? log.thoiGian.split('-')[1] : '';
-                            if (log.vung === 'Checkout Area') {
-                              thoiGianRa = timeStr;
-                            } else {
-                              thoiGianVao = timeStr;
-                            }
-                          } else if (sortedEmpLogs.length >= 2) {
-                            thoiGianVao = sortedEmpLogs[0].thoiGian ? sortedEmpLogs[0].thoiGian.split('-')[1] : '';
-                            thoiGianRa = sortedEmpLogs[sortedEmpLogs.length - 1].thoiGian ? sortedEmpLogs[sortedEmpLogs.length - 1].thoiGian.split('-')[1] : '';
-                          }
-                        }
-
-                        // Calculate evaluation
-                        let evaluationText: string;
-                        let evaluationType: 'good' | 'early' | 'absent' | 'manual';
-                        let ratioPercent = 0;
-
-                        if (!thoiGianVao && !thoiGianRa) {
-                          evaluationText = "Vắng";
-                          evaluationType = 'absent';
-                        } else if (!thoiGianVao || !thoiGianRa) {
-                          evaluationText = "Cần xử lý riêng";
-                          evaluationType = 'manual';
-                        } else {
-                          const inSec = timeStringToSeconds(thoiGianVao);
-                          const outSec = timeStringToSeconds(thoiGianRa);
-                          const spentSec = outSec - inSec;
-                          const ratio = Math.max(0, Math.min(100, Math.round((spentSec / meetingDur) * 100)));
-                          ratioPercent = ratio;
-                          if (ratio > 95) {
-                            evaluationText = `${ratio}%, Hoàn thành tốt`;
-                            evaluationType = 'good';
-                          } else {
-                            evaluationText = `${ratio}%, Rời phòng sớm`;
-                            evaluationType = 'early';
-                          }
-                        }
-
-                        let entryColorClass = 'text-white';
-                        let entryBadgeClass = 'text-white bg-slate-800/40 border-slate-700/50';
-                        let entryImageBorderClass = 'border-emerald-500/30';
-                        let entryImageCornersClass = 'border-emerald-400';
-                        let entryMatchBadgeClass = 'text-white border-emerald-500/20';
-
-                        if (thoiGianVao) {
-                          const inSec = timeStringToSeconds(thoiGianVao);
-                          const latenessSec = inSec - meetingStartSec;
-                          if (latenessSec > 0) {
-                            if (latenessSec <= 900) { // lateness <= 15 min
-                              entryColorClass = 'text-white';
-                              entryBadgeClass = 'text-white bg-slate-800/40 border-slate-700/50';
-                              entryImageBorderClass = 'border-emerald-500/30';
-                              entryImageCornersClass = 'border-emerald-400';
-                              entryMatchBadgeClass = 'text-white border-emerald-500/20';
-                            } else if (latenessSec <= 1800) { // lateness <= 30 min
-                              entryColorClass = 'text-amber-400';
-                              entryBadgeClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-                              entryImageBorderClass = 'border-emerald-500/30';
-                              entryImageCornersClass = 'border-emerald-400';
-                              entryMatchBadgeClass = 'text-white border-emerald-500/20';
-                            } else { // lateness > 30 min
-                              entryColorClass = 'text-rose-500';
-                              entryBadgeClass = 'text-rose-500 bg-rose-500/10 border-rose-500/20';
-                              entryImageBorderClass = 'border-[#21232d]';
-                              entryImageCornersClass = 'border-[#21232d]';
-                              entryMatchBadgeClass = 'text-white border-emerald-500/20';
-                            }
-                          }
-                        } else {
-                          entryColorClass = 'text-slate-500';
-                        }
-
-                        let exitColorClass = 'text-white';
-                        let exitBadgeClass = 'text-white bg-slate-800/40 border-slate-700/50';
-                        let exitImageBorderClass = 'border-emerald-500/30';
-                        let exitImageCornersClass = 'border-emerald-400';
-                        let exitMatchBadgeClass = 'text-white border-emerald-500/20';
-
-                        if (thoiGianRa) {
-                          const outSec = timeStringToSeconds(thoiGianRa);
-                          const earlinessSec = meetingEndSec - outSec;
-                          if (earlinessSec > 0) {
-                            if (earlinessSec <= 900) { // earliness <= 15 min
-                              exitColorClass = 'text-white';
-                              exitBadgeClass = 'text-white bg-slate-800/40 border-slate-700/50';
-                              exitImageBorderClass = 'border-emerald-500/30';
-                              exitImageCornersClass = 'border-emerald-400';
-                              exitMatchBadgeClass = 'text-white border-emerald-500/20';
-                            } else if (earlinessSec <= 1800) { // earliness <= 30 min
-                              exitColorClass = 'text-amber-400';
-                              exitBadgeClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-                              exitImageBorderClass = 'border-emerald-500/30';
-                              exitImageCornersClass = 'border-emerald-400';
-                              exitMatchBadgeClass = 'text-white border-emerald-500/20';
-                            } else { // earliness > 30 min
-                              exitColorClass = 'text-rose-500';
-                              exitBadgeClass = 'text-rose-500 bg-rose-500/10 border-rose-500/20';
-                              exitImageBorderClass = 'border-[#21232d]';
-                              exitImageCornersClass = 'border-[#21232d]';
-                              exitMatchBadgeClass = 'text-white border-emerald-500/20';
-                            }
-                          }
-                        } else {
-                          exitColorClass = 'text-slate-500';
-                        }
-
-                        let evaluationColorClass = 'text-emerald-400';
-                        if (evaluationType === 'absent' || entryColorClass === 'text-rose-500' || exitColorClass === 'text-rose-500') {
-                          evaluationColorClass = 'text-rose-500';
-                        } else if (evaluationType === 'manual' || evaluationType === 'early' || entryColorClass === 'text-amber-400' || exitColorClass === 'text-amber-400') {
-                          evaluationColorClass = 'text-amber-500';
-                        }
-
-                        // Convert emp object shape to look like the UI attendee
-                        const empShape = {
-                          ma: emp.maGiayTo || emp.id,
-                          ten: emp.hoTen,
-                          danhSach: emp.human_group[0] || 'Mặc định',
-                          avatarSeed: `avatar_${emp.id}`,
-                          originalObject: emp,
-                          entryEvent,
-                          exitEvent
-                        };
-
-                        return {
-                          emp: empShape,
-                          thoiGianVao,
-                          thoiGianRa,
-                          evaluationText,
-                          evaluationType,
-                          ratioPercent,
-                          entryColorClass,
-                          entryBadgeClass,
-                          entryImageBorderClass,
-                          entryImageCornersClass,
-                          entryMatchBadgeClass,
-                          exitColorClass,
-                          exitBadgeClass,
-                          exitImageBorderClass,
-                          exitImageCornersClass,
-                          exitMatchBadgeClass,
-                          evaluationColorClass
-                        };
-                      });
-
-                      // Sort roster so present people are shown first, then manual, then absent!
-                      const sortedAttendeeRoster = [...attendeeRoster].sort((a, b) => {
-                        const order = { good: 1, early: 2, manual: 3, absent: 4 };
-                        return order[a.evaluationType] - order[b.evaluationType];
-                      });
-                      // Sync roster to state for Excel export (deferred to avoid setState-during-render)
-                      setTimeout(() => setComputedAttendeeRoster(sortedAttendeeRoster), 0);
+                      const sortedAttendeeRoster = computedAttendeeRoster;
 
                       // Find active selected attendee or default to the first one in the filtered list
                       let activeSelectedCode = selectedMeetingEmpCode;

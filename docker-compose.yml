@@ -1,3 +1,4 @@
+name: cms_faceid
 version: '3.8'
 
 services:
@@ -6,7 +7,7 @@ services:
     image: postgres:15-alpine
     container_name: cms_faceid-postgres
     ports:
-      - "5433:5432"
+      - "5434:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: your_secure_password # Hãy đổi mật khẩu này khi triển khai thực tế
@@ -22,6 +23,7 @@ services:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
+    image: cms_faceid-backend:latest
     container_name: cms_faceid-backend
     expose:
       - "3000"
@@ -63,64 +65,4 @@ volumes:
 
 networks:
   cms-faceid-network:
-    driver: bridge
-version: '3.8'
-
-services:
-  # Database postgres riêng của hệ thống
-  postgres-db:
-    image: postgres:15-alpine
-    container_name: lovad-postgres
-    ports:
-      - "5433:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: your_secure_password # Hãy đổi mật khẩu này khi triển khai thực tế
-      POSTGRES_DB: cms_webserver
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    restart: always
-    networks:
-      - lovad-network
-
-  # Backend NestJS
-  backend:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
-    container_name: lovad-backend
-    expose:
-      - "3000"
-    environment:
-      # Biến cấu hình Database riêng và các Database bên thứ 3 kết nối qua mạng docker hoặc IP Host
-      - CMS_WEBSERVER_DATABASE_URL=postgresql://postgres:your_secure_password@postgres-db:5432/cms_webserver?connect_timeout=15
-      - LCMS_DATABASE_URL=postgresql://postgres:your_secure_password@postgres-db:5432/lcms_server?connect_timeout=15&pooling=true&minpoolsize=0&maxpoolsize=200
-      - DVMS_DATABASE_URL=postgresql://postgres:your_secure_password@postgres-db:5432/dvms_server?connect_timeout=15
-      - PORT=3000
-    depends_on:
-      - postgres-db
-    restart: always
-    networks:
-      - lovad-network
-
-  # Nginx Reverse Proxy làm cổng HTTP (cổng 80)
-  nginx:
-    image: nginx:alpine
-    container_name: lovad-nginx
-    ports:
-      - "8082:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - backend
-    restart: always
-    networks:
-      - lovad-network
-
-volumes:
-  pgdata:
-    driver: local
-
-networks:
-  lovad-network:
     driver: bridge

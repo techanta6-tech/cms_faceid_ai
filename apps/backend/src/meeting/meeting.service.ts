@@ -252,13 +252,22 @@ export class MeetingService {
       };
     }
 
-    // 2. Calculate time range
-    const getOffsetDateTime = (date: Date, timeStr: string, offsetMinutes: number): Date => {
+    // 2. Calculate time range (returns YYYY-MM-DD HH:mm:ss local string to avoid UTC/Z offset issues)
+    const getOffsetDateTime = (date: Date, timeStr: string, offsetMinutes: number): string => {
       const [h, m] = timeStr.split(':').map(Number);
       const res = new Date(date);
       res.setHours(h, m, 0, 0);
       res.setMinutes(res.getMinutes() + offsetMinutes);
-      return res;
+      
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const yyyy = res.getFullYear();
+      const mm = pad(res.getMonth() + 1);
+      const dd = pad(res.getDate());
+      const hh = pad(res.getHours());
+      const min = pad(res.getMinutes());
+      const ss = pad(res.getSeconds());
+      
+      return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
     };
 
     const startTime = getOffsetDateTime(meeting.date_organize, meeting.time_start, -meeting.time_before_begin);
@@ -290,8 +299,8 @@ export class MeetingService {
       LEFT JOIN event_image_parent ei_face
           ON ev.source_id = ei_face.statistic_id AND ei_face.type = 4
       WHERE 
-          ev.create_time >= $1 
-          AND ev.create_time <= $2
+          ev.create_time >= $1::timestamp 
+          AND ev.create_time <= $2::timestamp
           AND es.camera_event_id = ANY($3::varchar[])
           AND h.list_ids && $4::varchar[]
           AND LOWER(ca.area_name) = 'diem danh'
