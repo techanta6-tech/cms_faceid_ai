@@ -1,5 +1,7 @@
 FROM node:20-alpine AS builder
 
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
 # Copy root configs
@@ -20,6 +22,8 @@ RUN yarn workspace backend build
 
 # --- Production runner image ---
 FROM node:20-alpine AS runner
+
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
@@ -43,4 +47,4 @@ COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
 EXPOSE 3000
 
 # Start NestJS backend in production mode
-CMD ["yarn", "workspace", "backend", "start:prod"]
+CMD ["sh", "-c", "yarn workspace backend prisma:push && yarn workspace backend start:prod"]

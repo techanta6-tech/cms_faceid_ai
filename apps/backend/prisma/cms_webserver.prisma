@@ -1,11 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/cms_webserver"
+  provider      = "prisma-client-js"
+  output        = "../generated/cms_webserver"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:@localhost:5433/cms_webserver?connect_timeout=15"
+  url      = env("CMS_WEBSERVER_DATABASE_URL")
 }
 
 model location {

@@ -9,6 +9,7 @@
     "start:dev:nogen": "node ../../node_modules/@nestjs/cli/bin/nest.js start --watch",
     "start:prod": "node dist/main",
     "prisma:generate": "node ../../node_modules/prisma/build/index.js generate --schema=prisma/lcms.prisma && node ../../node_modules/prisma/build/index.js generate --schema=prisma/dvms.prisma && node ../../node_modules/prisma/build/index.js generate --schema=prisma/cms_webserver.prisma",
+    "prisma:push": "node ../../node_modules/prisma/build/index.js db push --schema=prisma/lcms.prisma --accept-data-loss --skip-generate && node ../../node_modules/prisma/build/index.js db push --schema=prisma/dvms.prisma --accept-data-loss --skip-generate && node ../../node_modules/prisma/build/index.js db push --schema=prisma/cms_webserver.prisma --accept-data-loss --skip-generate",
     "prisma:studio:lcms": "node ../../node_modules/prisma/build/index.js studio --schema=prisma/lcms.prisma",
     "prisma:studio:dvms": "node ../../node_modules/prisma/build/index.js studio --schema=prisma/dvms.prisma",
     "prisma:studio:cms": "node ../../node_modules/prisma/build/index.js studio --schema=prisma/cms_webserver.prisma"
@@ -20,6 +21,7 @@
     "@nestjs/platform-socket.io": "^11.1.28",
     "@nestjs/websockets": "^11.1.28",
     "@prisma/client": "^5.10.0",
+    "prisma": "^5.10.0",
     "sharp": "^0.33.5",
     "reflect-metadata": "^0.2.1",
     "rxjs": "^7.8.1",
@@ -35,7 +37,6 @@
     "@nestjs/schematics": "^10.0.0",
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.0",
-    "prisma": "^5.10.0",
     "typescript": "^5.3.0"
   }
 }

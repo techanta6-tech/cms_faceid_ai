@@ -24,6 +24,7 @@ import {
   Play,
   Monitor,
   AlertTriangle,
+  CameraOff,
   Download,
   ChevronDown,
   Calendar,
@@ -51,7 +52,7 @@ const resolveImageUrl = (path?: string) => {
 };
 
 export const ReportPage = () => {
-  const { eventLogs, meetings, areasData, employees } = useApp();
+  const { eventLogs, meetings, areasData, employees, isLoadingLogs } = useApp();
   const [flashActive, setFlashActive] = useState(false);
 
   // Derive the legacy meeting shape (area/date/startTime/endTime/departments)
@@ -463,48 +464,73 @@ export const ReportPage = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#1b1c24] text-xs font-mono">
-                          {currentLogs.map((log) => {
-                            const isSelected = selectedEventId === log.stt;
-                            const isTranPhuocLoi = log.ma === "010203045567";
-                            return (
-                              <tr 
-                                id={`event-row-${log.stt}`}
-                                key={log.stt}
-                                onClick={() => {
-                                  setSelectedEventId(log.stt);
-                                  setSelectedThumbIndex(0); // Reset thumbnail zoom index
-                                }}
-                                className={`cursor-pointer transition duration-150 ${
-                                  isSelected 
-                                    ? 'bg-[#005a9e] text-white hover:bg-[#0062ac]' 
-                                    : isTranPhuocLoi 
-                                      ? 'bg-amber-950/10 text-amber-200 hover:bg-[#1f202b]' 
-                                      : 'hover:bg-[#181922] odd:bg-[#0e0f14] even:bg-[#101117] text-slate-300'
-                                }`}
-                              >
-                                <td className="py-2 px-3 border-r border-[#21232d] text-center font-semibold text-slate-400">
-                                  {log.stt}
+                          {isLoadingLogs ? (
+                            Array.from({ length: itemsPerPage }).map((_, index) => (
+                              <tr key={`skeleton-${index}`} className="animate-pulse border-b border-[#21232d] hover:bg-transparent">
+                                <td className="py-2.5 px-3 border-r border-[#21232d] text-center w-12">
+                                  <div className="h-4 bg-[#1f202b] rounded-md mx-auto w-6"></div>
                                 </td>
-                                <td className={`py-2 px-3 border-r border-[#21232d] ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                                  {log.vung}
+                                <td className="py-2.5 px-3 border-r border-[#21232d]">
+                                  <div className="h-4 bg-[#1f202b] rounded-md w-28"></div>
                                 </td>
-                                <td className={`py-2 px-3 border-r border-[#21232d] font-sans font-medium ${isSelected ? 'text-white' : 'text-slate-100'}`}>
-                                  {log.ten}
+                                <td className="py-2.5 px-3 border-r border-[#21232d]">
+                                  <div className="h-4 bg-[#1f202b] rounded-md w-36"></div>
                                 </td>
-                                <td className="py-2 px-3 border-r border-[#21232d] text-slate-400">
-                                  {log.ma}
+                                <td className="py-2.5 px-3 border-r border-[#21232d]">
+                                  <div className="h-4 bg-[#1f202b] rounded-md w-24"></div>
                                 </td>
-                                <td className={`py-2 px-3 border-r border-[#21232d] font-sans ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                                  {log.danhSach}
+                                <td className="py-2.5 px-3 border-r border-[#21232d]">
+                                  <div className="h-4 bg-[#1f202b] rounded-md w-20"></div>
                                 </td>
-                                <td className="py-2 px-3 text-slate-400">
-                                  {log.thoiGian}
+                                <td className="py-2.5 px-3">
+                                  <div className="h-4 bg-[#1f202b] rounded-md w-32"></div>
                                 </td>
                               </tr>
-                            );
-                          })}
+                            ))
+                          ) : (
+                            currentLogs.map((log) => {
+                              const isSelected = selectedEventId === log.stt;
+                              const isTranPhuocLoi = log.ma === "010203045567";
+                              return (
+                                <tr 
+                                  id={`event-row-${log.stt}`}
+                                  key={log.stt}
+                                  onClick={() => {
+                                    setSelectedEventId(log.stt);
+                                    setSelectedThumbIndex(0); // Reset thumbnail zoom index
+                                  }}
+                                  className={`cursor-pointer transition duration-150 ${
+                                    isSelected 
+                                      ? 'bg-[#005a9e] text-white hover:bg-[#0062ac]' 
+                                      : isTranPhuocLoi 
+                                        ? 'bg-amber-950/10 text-amber-200 hover:bg-[#1f202b]' 
+                                        : 'hover:bg-[#181922] odd:bg-[#0e0f14] even:bg-[#101117] text-slate-300'
+                                  }`}
+                                >
+                                  <td className="py-2 px-3 border-r border-[#21232d] text-center font-semibold text-slate-400">
+                                    {log.stt}
+                                  </td>
+                                  <td className={`py-2 px-3 border-r border-[#21232d] ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                                    {log.vung}
+                                  </td>
+                                  <td className={`py-2 px-3 border-r border-[#21232d] font-sans font-medium ${isSelected ? 'text-white' : 'text-slate-100'}`}>
+                                    {log.ten}
+                                  </td>
+                                  <td className="py-2 px-3 border-r border-[#21232d] text-slate-400">
+                                    {log.ma}
+                                  </td>
+                                  <td className={`py-2 px-3 border-r border-[#21232d] font-sans ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                                    {log.danhSach}
+                                  </td>
+                                  <td className="py-2 px-3 text-slate-400">
+                                    {log.thoiGian}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
 
-                          {currentLogs.length === 0 && (
+                          {!isLoadingLogs && currentLogs.length === 0 && (
                             <tr>
                               <td colSpan={6} className="py-8 text-center text-slate-500 font-sans">
                                 <AlertTriangle size={24} className="mx-auto mb-2 text-slate-600" />
@@ -596,120 +622,127 @@ export const ReportPage = () => {
 
                   {/* RIGHT PANEL: CAMERA MONITOR (Replicated directly from the image) */}
                   <div id="camera-panel" className="w-[450px] bg-[#111218] flex flex-col shrink-0 overflow-y-auto">
-                    
-                    {/* Main Simulated Camera Viewport Container */}
-                    <div className="p-4 space-y-4">
-                      
-                      {/* Simulated Camera Window */}
-                      <div className="relative aspect-[4/3] bg-black rounded-lg border border-[#2d2f3e] overflow-hidden group shadow-lg">
-                        
-                        {/* Selected Person Image */}
-                        <img 
-                          src={
-                            selectedThumbIndex === 1
-                              ? resolveImageUrl((currentSelectedEvent as any).full_image_path) || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=150&h=150"
-                              : selectedThumbIndex === 0
-                                ? resolveImageUrl((currentSelectedEvent as any).face_image_path) || (currentSelectedEvent as any).faceImgBase64 || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")
-                                : (currentSelectedEvent as any).faceImgBase64 || resolveImageUrl((currentSelectedEvent as any).face_image_path) || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")
-                          } 
-                          alt="Face checkin capture"
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-contain opacity-90 transition duration-300"
-                        />
-
-                        {/* Flash effect animation */}
-                        <AnimatePresence>
-                          {flashActive && (
-                            <motion.div 
-                              initial={{ opacity: 1 }}
-                              animate={{ opacity: 0 }}
-                              className="absolute inset-0 bg-white z-40 pointer-events-none"
-                            />
-                          )}
-                        </AnimatePresence>
-
-                        {/* 2. Technical OSD details overlaid on CCTV (Only display image quality) */}
-                        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm border border-slate-700/40 px-2.5 py-1 rounded text-[10px] font-mono text-emerald-400 font-bold z-20">
-                          CHẤT LƯỢNG: <span className="text-white">1080P</span>
-                        </div>
-
-                        <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded text-[9px] font-mono text-slate-300 z-20 border border-slate-700/40">
-                          {currentSelectedEvent.thoiGian}
-                        </div>
+                    {!currentSelectedEvent ? (
+                      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                        <CameraOff size={32} className="mx-auto text-slate-600 mb-2" />
+                        <span className="text-xs font-semibold text-slate-400 block mb-1">Không có sự kiện</span>
+                        <p className="text-[11px] text-slate-500 max-w-sm mx-auto">Vui lòng chọn hoặc tải sự kiện để xem chi tiết.</p>
                       </div>
+                    ) : (
+                      /* Main Simulated Camera Viewport Container */
+                      <div className="p-4 space-y-4">
+                        
+                        {/* Simulated Camera Window */}
+                        <div className="relative aspect-[4/3] bg-black rounded-lg border border-[#2d2f3e] overflow-hidden group shadow-lg">
+                          
+                          {/* Selected Person Image */}
+                          <img 
+                            src={
+                              selectedThumbIndex === 1
+                                ? resolveImageUrl((currentSelectedEvent as any).full_image_path) || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=150&h=150"
+                                : selectedThumbIndex === 0
+                                  ? resolveImageUrl((currentSelectedEvent as any).face_image_path) || (currentSelectedEvent as any).faceImgBase64 || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")
+                                  : (currentSelectedEvent as any).faceImgBase64 || resolveImageUrl((currentSelectedEvent as any).face_image_path) || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")
+                            } 
+                            alt="Face checkin capture"
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-contain opacity-90 transition duration-300"
+                          />
 
-                      {/* 3. Thumbnails Strip Below Camera View */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {/* Selected thumbnail 1 */}
-                        <button 
-                          onClick={() => setSelectedThumbIndex(0)}
-                          className={`relative aspect-square rounded border overflow-hidden transition ${
-                            selectedThumbIndex === 0 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
-                          }`}
-                        >
-                          {(currentSelectedEvent as any).face_image_path || (currentSelectedEvent as any).faceImgBase64 || currentSelectedEvent.avatarSeed ? (
+                          {/* Flash effect animation */}
+                          <AnimatePresence>
+                            {flashActive && (
+                              <motion.div 
+                                initial={{ opacity: 1 }}
+                                animate={{ opacity: 0 }}
+                                className="absolute inset-0 bg-white z-40 pointer-events-none"
+                              />
+                            )}
+                          </AnimatePresence>
+
+                          {/* 2. Technical OSD details overlaid on CCTV (Only display image quality) */}
+                          <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm border border-slate-700/40 px-2.5 py-1 rounded text-[10px] font-mono text-emerald-400 font-bold z-20">
+                            CHẤT LƯỢNG: <span className="text-white">1080P</span>
+                          </div>
+
+                          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded text-[9px] font-mono text-slate-300 z-20 border border-slate-700/40">
+                            {currentSelectedEvent.thoiGian}
+                          </div>
+                        </div>
+
+                        {/* 3. Thumbnails Strip Below Camera View */}
+                        <div className="grid grid-cols-4 gap-2">
+                          {/* Selected thumbnail 1 */}
+                          <button 
+                            onClick={() => setSelectedThumbIndex(0)}
+                            className={`relative aspect-square rounded border overflow-hidden transition ${
+                              selectedThumbIndex === 0 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
+                            }`}
+                          >
+                            {(currentSelectedEvent as any).face_image_path || (currentSelectedEvent as any).faceImgBase64 || currentSelectedEvent.avatarSeed ? (
+                              <img 
+                                src={resolveImageUrl((currentSelectedEvent as any).face_image_path) || (currentSelectedEvent as any).faceImgBase64 || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")} 
+                                alt="Crop face close-up"
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-[#1c1d24]" />
+                            )}
+                          </button>
+
+                          {/* Thumbnail 2: Alternative scene layout */}
+                          <button 
+                            onClick={() => setSelectedThumbIndex(1)}
+                            className={`relative aspect-square rounded border overflow-hidden transition ${
+                              selectedThumbIndex === 1 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
+                            }`}
+                          >
                             <img 
-                              src={resolveImageUrl((currentSelectedEvent as any).face_image_path) || (currentSelectedEvent as any).faceImgBase64 || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")} 
-                              alt="Crop face close-up"
+                              src={resolveImageUrl((currentSelectedEvent as any).full_image_path) || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=150&h=150"} 
+                              alt="Wide background snapshot"
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-cover"
                             />
-                          ) : (
-                            <div className="w-full h-full bg-[#1c1d24]" />
-                          )}
-                        </button>
+                          </button>
 
-                        {/* Thumbnail 2: Alternative scene layout */}
-                        <button 
-                          onClick={() => setSelectedThumbIndex(1)}
-                          className={`relative aspect-square rounded border overflow-hidden transition ${
-                            selectedThumbIndex === 1 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
-                          }`}
-                        >
-                          <img 
-                            src={resolveImageUrl((currentSelectedEvent as any).full_image_path) || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=150&h=150"} 
-                            alt="Wide background snapshot"
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover"
-                          />
-                        </button>
+                          {/* Thumbnail 3: Zoomed camera frame */}
+                          <button 
+                            onClick={() => setSelectedThumbIndex(2)}
+                            className={`relative aspect-square rounded border overflow-hidden transition ${
+                              selectedThumbIndex === 2 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
+                            }`}
+                          >
+                            {(currentSelectedEvent as any).faceImgBase64 || (currentSelectedEvent as any).face_image_path || currentSelectedEvent.avatarSeed ? (
+                              <img 
+                                src={(currentSelectedEvent as any).faceImgBase64 || resolveImageUrl((currentSelectedEvent as any).face_image_path) || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")} 
+                                alt="Cropped profile view"
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover scale-150 origin-center"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-[#1c1d24]" />
+                            )}
+                          </button>
 
-                        {/* Thumbnail 3: Zoomed camera frame */}
-                        <button 
-                          onClick={() => setSelectedThumbIndex(2)}
-                          className={`relative aspect-square rounded border overflow-hidden transition ${
-                            selectedThumbIndex === 2 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
-                          }`}
-                        >
-                          {(currentSelectedEvent as any).faceImgBase64 || (currentSelectedEvent as any).face_image_path || currentSelectedEvent.avatarSeed ? (
-                            <img 
-                              src={(currentSelectedEvent as any).faceImgBase64 || resolveImageUrl((currentSelectedEvent as any).face_image_path) || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")} 
-                              alt="Cropped profile view"
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover scale-150 origin-center"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-[#1c1d24]" />
-                          )}
-                        </button>
+                          {/* Thumbnail 4: Tải ảnh & video đính kèm */}
+                          <button 
+                            onClick={() => {
+                              alert("Đang chuẩn bị tải xuống toàn bộ tập tin hình ảnh và video đính kèm chất lượng cao...");
+                            }}
+                            className="aspect-square rounded border border-[#2d2f3e] bg-[#1c1d24] hover:bg-[#252731] hover:border-[#00a2e8] flex flex-col items-center justify-center space-y-1 transition group"
+                            title="Tải các ảnh & video đính kèm"
+                          >
+                            <Download size={18} className="text-slate-400 group-hover:text-[#00a2e8] transition" />
+                            <span className="text-[9px] text-slate-400 group-hover:text-slate-200 transition text-center leading-tight">
+                              Tải ảnh/video
+                            </span>
+                          </button>
+                        </div>
 
-                        {/* Thumbnail 4: Tải ảnh & video đính kèm */}
-                        <button 
-                          onClick={() => {
-                            alert("Đang chuẩn bị tải xuống toàn bộ tập tin hình ảnh và video đính kèm chất lượng cao...");
-                          }}
-                          className="aspect-square rounded border border-[#2d2f3e] bg-[#1c1d24] hover:bg-[#252731] hover:border-[#00a2e8] flex flex-col items-center justify-center space-y-1 transition group"
-                          title="Tải các ảnh & video đính kèm"
-                        >
-                          <Download size={18} className="text-slate-400 group-hover:text-[#00a2e8] transition" />
-                          <span className="text-[9px] text-slate-400 group-hover:text-slate-200 transition text-center leading-tight">
-                            Tải ảnh/video
-                          </span>
-                        </button>
+                        {/* Dropdown Camera Select Block (Removed) */}
                       </div>
-
-                      {/* Dropdown Camera Select Block (Removed) */}
-                    </div>
+                    )}
                   </div>
                 </div>
               ) : activeTab === 'attendance' ? (

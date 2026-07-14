@@ -1,11 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/dvms"
+  provider      = "prisma-client-js"
+  output        = "../generated/dvms"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:@localhost:5433/dvms_server?connect_timeout=15"
+  url      = env("DVMS_DATABASE_URL")
 }
 
 model camera_cfg {
