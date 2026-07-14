@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Res, Query } from '@nestjs/common';
+import { Response } from 'express';
 import {
   CreateMeetingDto,
   MeetingService,
@@ -15,8 +16,57 @@ export class MeetingController {
   }
 
   @Get('event-logs')
-  async getEventLogs() {
-    return this.meetingService.getEventLogs();
+  async getEventLogs(
+    @Query('page')      page?:      string,
+    @Query('limit')     limit?:     string,
+    @Query('search')    search?:    string,
+    @Query('zone')      zone?:      string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate')   endDate?:   string,
+    @Query('startTime') startTime?: string,
+    @Query('endTime')   endTime?:   string,
+    @Query('group')     group?:     string,
+    @Query('eventType') eventType?: string,
+  ) {
+    return this.meetingService.getEventLogs({
+      page:      page      ? parseInt(page,  10) : 1,
+      limit:     limit     ? parseInt(limit, 10) : 10,
+      search,
+      zone,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      group,
+      eventType,
+    });
+  }
+
+  @Get('event-logs/ids')
+  async getEventLogIds(
+    @Query('page')      page?:      string,
+    @Query('limit')     limit?:     string,
+    @Query('search')    search?:    string,
+    @Query('zone')      zone?:      string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate')   endDate?:   string,
+    @Query('startTime') startTime?: string,
+    @Query('endTime')   endTime?:   string,
+    @Query('group')     group?:     string,
+    @Query('eventType') eventType?: string,
+  ) {
+    return this.meetingService.getEventLogIds({
+      page:      page      ? parseInt(page,  10) : 1,
+      limit:     limit     ? parseInt(limit, 10) : 10,
+      search,
+      zone,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      group,
+      eventType,
+    });
   }
 
   @Get(':id')
@@ -42,5 +92,10 @@ export class MeetingController {
   @Get(':id/attendance-report')
   async getAttendanceReport(@Param('id') id: string) {
     return this.meetingService.getAttendanceReport(id);
+  }
+
+  @Post('export-excel')
+  async exportExcel(@Body('data') data: any[], @Res() res: Response) {
+    return this.meetingService.exportExcel(data, res);
   }
 }

@@ -67,6 +67,7 @@ const mapMeetingRow = (row: any): Meeting => ({
 interface AppContextType {
   eventLogs: EventLog[];
   setEventLogs: React.Dispatch<React.SetStateAction<EventLog[]>>;
+  isLoadingLogs: boolean;
   employees: any[];
   setEmployees: React.Dispatch<React.SetStateAction<any[]>>;
   devices: DeviceInfo[];
@@ -103,25 +104,10 @@ interface AppProviderProps {
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const { socket } = useSocket();
-  const [eventLogs, setEventLogs] = useState<EventLog[]>(mockEventLogs);
-
-  // Tải danh sách sự kiện từ cơ sở dữ liệu khi khởi chạy
-  useEffect(() => {
-    const loadEventLogs = async () => {
-      try {
-        const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
-        const res = await fetch(`${baseUrl}/meeting/event-logs`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setEventLogs(data);
-        }
-      } catch (e: any) {
-        console.warn('Failed to load event logs from database, using mock logs:', e.message);
-      }
-    };
-    loadEventLogs();
-  }, []);
+  // eventLogs is now managed locally in ReportPage (server-side pagination).
+  // AppContext keeps a lightweight list of real-time socket-pushed events only.
+  const [eventLogs, setEventLogs] = useState<EventLog[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
   // Lắng nghe sự kiện WebSocket thời gian thực toàn cục
   useEffect(() => {
@@ -132,6 +118,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const newEvent: EventLog = {
         stt: Math.floor(Math.random() * 1000000),
         vung: log.areaName,
+        camera_id: log.cameraId || log.camera_id || log.cameraEventId,
         ten: log.hoTen,
         ma: log.employeeId,
         danhSach: log.phongBan,
@@ -591,6 +578,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     <AppContext.Provider value={{
       eventLogs,
       setEventLogs,
+      isLoadingLogs,
       employees,
       setEmployees,
       devices,

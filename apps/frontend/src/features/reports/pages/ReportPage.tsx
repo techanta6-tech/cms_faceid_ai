@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { 
   List, 
   TrendingUp, 
@@ -24,6 +24,7 @@ import {
   Play,
   Monitor,
   AlertTriangle,
+  CameraOff,
   Download,
   ChevronDown,
   Calendar,
@@ -50,9 +51,27 @@ const resolveImageUrl = (path?: string) => {
   return `${baseUrl}/media?path=${encodeURIComponent(path)}`;
 };
 
+const parseToLocalTime = (timeCreated?: string): string => {
+  if (!timeCreated) return '';
+  const d = new Date(timeCreated.replace('Z', ''));
+  return d.toTimeString().split(' ')[0]; // "HH:mm:ss"
+};
+
 export const ReportPage = () => {
-  const { eventLogs, meetings, areasData, employees } = useApp();
+  const { eventLogs, meetings, areasData, employees, isLoadingLogs, humanGroups } = useApp();
   const [flashActive, setFlashActive] = useState(false);
+
+  const getAreaSuffix = (log: EventLog) => {
+    const camera_id = log.camera_id;
+    if (!camera_id) return 'khác';
+    const area = areasData.find(a => a.name === log.vung);
+    if (!area) return 'khác';
+    const camera = area.cameras.find(c => c.camera_id === camera_id);
+    if (!camera) return 'khác';
+    if (camera.role.includes('checkin')) return 'vào';
+    if (camera.role.includes('checkout')) return 'ra';
+    return 'khác';
+  };
 
   // Derive the legacy meeting shape (area/date/startTime/endTime/departments)
   // used throughout this page's render logic from the real Meeting[] data
@@ -78,6 +97,10 @@ export const ReportPage = () => {
   
   // Data list and filter states
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterEventType, setFilterEventType] = useState<'All' | 'in' | 'out'>('All');
+  const [isOpenEventTypeDropdown, setIsOpenEventTypeDropdown] = useState(false);
+  const [appliedList, setAppliedList] = useState('All');
+  const [appliedEventType, setAppliedEventType] = useState<'All' | 'in' | 'out'>('All');
   const [filterZone, setFilterZone] = useState('All');
   const [filterList, setFilterList] = useState('All');
   const [startDate, setStartDate] = useState('');
@@ -93,16 +116,94 @@ export const ReportPage = () => {
   const [isOpenListDropdown, setIsOpenListDropdown] = useState(false);
   const [zoneSearch, setZoneSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12;
-  
-  // Selected event
-  const [selectedEventId, setSelectedEventId] = useState<number>(22);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isPerPageOpen, setIsPerPageOpen] = useState(false);
+  const PER_PAGE_OPTIONS = [10, 20, 40, 50, 100];
+  const [showAttendanceReportDemo, setShowAttendanceReportDemo] = useState(false);
 
-  useEffect(() => {
-    if (eventLogs && eventLogs.length > 0) {
-      setSelectedEventId(eventLogs[0].stt);
+  // Server-side paginated data
+  const [pageLogs, setPageLogs] = useState<EventLog[]>([]);
+  const [totalServerItems, setTotalServerItems] = useState(0);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+
+  // Applied filters (committed on search button click)
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [appliedZone, setAppliedZone] = useState('All');
+  const [appliedStartDate, setAppliedStartDate] = useState('');
+  const [appliedEndDate, setAppliedEndDate] = useState('');
+  const [appliedStartTime, setAppliedStartTime] = useState('');
+  const [appliedEndTime, setAppliedEndTime] = useState('');
+
+  const buildEventLogsUrl = useCallback((extra: Record<string, string> = {}) => {
+    const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
+    const params = new URLSearchParams({
+      page:  String(currentPage),
+      limit: String(itemsPerPage),
+      ...(appliedSearch    ? { search:    appliedSearch }    : {}),
+      ...(appliedZone && appliedZone !== 'All' ? { zone: appliedZone } : {}),
+      ...(appliedStartDate ? { startDate: appliedStartDate } : {}),
+      ...(appliedEndDate   ? { endDate:   appliedEndDate }   : {}),
+      ...(appliedStartTime ? { startTime: appliedStartTime } : {}),
+      ...(appliedEndTime   ? { endTime:   appliedEndTime }   : {}),
+      ...(appliedList && appliedList !== 'All' ? { group: appliedList } : {}),
+      ...(appliedEventType && appliedEventType !== 'All' ? { eventType: appliedEventType } : {}),
+      ...extra,
+    });
+    return { baseUrl, params };
+  }, [currentPage, itemsPerPage, appliedSearch, appliedZone, appliedStartDate, appliedEndDate, appliedStartTime, appliedEndTime, appliedList, appliedEventType]);
+
+  const fetchPage = useCallback(async () => {
+    setIsLoadingPage(true);
+    try {
+      const { baseUrl, params } = buildEventLogsUrl();
+      const res = await fetch(`${baseUrl}/meeting/event-logs?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json && Array.isArray(json.data)) {
+        setPageLogs(json.data);
+        setTotalServerItems(json.total ?? 0);
+        if (json.data.length > 0) setSelectedEventId(json.data[0].stt);
+      }
+    } catch (e: any) {
+      console.warn('Failed to load event logs page:', e.message);
+    } finally {
+      setIsLoadingPage(false);
     }
-  }, [eventLogs]);
+  }, [buildEventLogsUrl]);
+
+  // Reload page when pagination or applied filters change
+  useEffect(() => {
+    fetchPage();
+  }, [fetchPage]);
+
+  // 10-second polling: fetch IDs only, compare with current page
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const { baseUrl, params } = buildEventLogsUrl();
+        const res = await fetch(`${baseUrl}/meeting/event-logs/ids?${params.toString()}`);
+        if (!res.ok) return;
+        const freshIds: string[] = await res.json();
+        const currentIds = pageLogs.map(l => l.id);
+        const changed = freshIds.length !== currentIds.length ||
+          freshIds.some((id, i) => id !== currentIds[i]);
+        if (changed) {
+          fetchPage();
+        }
+      } catch { /* silent */ }
+    };
+    const timer = setInterval(poll, 10_000);
+    return () => clearInterval(timer);
+  }, [buildEventLogsUrl, pageLogs, fetchPage]);
+
+  // Derived pagination values (server-side)
+  const filteredLogs = pageLogs;   // alias kept for export compatibility
+  const currentLogs  = pageLogs;
+  const totalItems   = totalServerItems;
+  const totalPages   = Math.ceil(totalItems / itemsPerPage) || 1;
+
+  // Selected event
+  const [selectedEventId, setSelectedEventId] = useState<number>(0);
 
   // Toast / Export status simulation
   const [exporting, setExporting] = useState(false);
@@ -125,23 +226,50 @@ export const ReportPage = () => {
   const [selectedMeetingEmpCode, setSelectedMeetingEmpCode] = useState<string | null>(null);
 
   // New Meeting Report custom search & selection states
-  const [meetingStartDate, setMeetingStartDate] = useState('2026-07-09');
-  const [meetingEndDate, setMeetingEndDate] = useState('2026-07-11');
+  const [meetingStartDate, setMeetingStartDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setMonth(d.getMonth() - 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+  const [meetingEndDate, setMeetingEndDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
   const [selectedMeetingAreas, setSelectedMeetingAreas] = useState<string[]>([]);
   const [isMeetingAreaDropdownOpen, setIsMeetingAreaDropdownOpen] = useState(false);
   const [selectedMeetingReport, setSelectedMeetingReport] = useState<any | null>(null);
 
-  // Applied search filters
-  const [appliedStartDate, setAppliedStartDate] = useState('2026-07-09');
-  const [appliedEndDate, setAppliedEndDate] = useState('2026-07-11');
-  const [appliedStartTime, setAppliedStartTime] = useState('00:00');
-  const [appliedEndTime, setAppliedEndTime] = useState('23:59');
+  // Applied Meeting Report filters (committed via search button)
+  const [appliedMeetingStartDate, setAppliedMeetingStartDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setMonth(d.getMonth() - 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+  const [appliedMeetingEndDate, setAppliedMeetingEndDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
   const [appliedMeetingAreas, setAppliedMeetingAreas] = useState<string[]>([]);
 
   // Real Database Meeting Report states
   const [meetingReportData, setMeetingReportData] = useState<{
-    checkinEvents: any[];
-    checkoutEvents: any[];
+    attendance: any[];
   } | null>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [computedAttendeeRoster, setComputedAttendeeRoster] = useState([]);
@@ -185,6 +313,46 @@ export const ReportPage = () => {
         return prev + 10;
       });
     }, 150);
+  };
+
+  // Export event list to Excel via backend API
+  const handleExportExcelData = async (rows: typeof filteredLogs) => {
+    if (rows.length === 0) return;
+    setExporting(true);
+    try {
+      const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
+      // Strip image fields before sending to reduce payload size
+      const payload = rows.map(({ stt, vung, camera_id, ten, ma, danhSach, thoiGian, accuracy }) => ({
+        stt,
+        vung: `${vung} (${getAreaSuffix({ stt, vung, camera_id, ten, ma, danhSach, thoiGian, avatarSeed: '' })})`,
+        ten,
+        ma,
+        danhSach,
+        thoiGian,
+        accuracy,
+      }));
+      const res = await fetch(`${baseUrl}/meeting/export-excel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: payload }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'DanhSachSuKien.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setShowExportToast(true);
+      setTimeout(() => setShowExportToast(false), 4000);
+    } catch (e: any) {
+      console.error('Export failed:', e.message);
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Export meeting attendance report to Excel
@@ -283,53 +451,13 @@ export const ReportPage = () => {
   };
 
   // Find the currently selected event details
-  const currentSelectedEvent = eventLogs.find(e => e.stt === selectedEventId) || eventLogs[21] || eventLogs[0];
-
-  // Filter logs based on search and drop-downs
-  const filteredLogs = eventLogs.filter(log => {
-    const matchesSearch = log.ten.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          log.ma.includes(searchQuery) ||
-                          log.vung.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesZone = filterZone === 'All' || log.vung === filterZone;
-    const matchesList = filterList === 'All' || log.danhSach === filterList;
-
-    let matchesStartDate = true;
-    let matchesEndDate = true;
-
-    if (log.thoiGian) {
-      const [datePart, timePart] = log.thoiGian.split('-');
-      if (datePart) {
-        const [day, month, year] = datePart.split('/');
-        const logDateStr = `${year}-${month}-${day}`;
-        const logDateTimeStr = timePart ? `${logDateStr}T${timePart}` : `${logDateStr}T00:00:00`;
-
-        if (startDate) {
-          const startCompare = startTime ? `${startDate}T${startTime}:00` : `${startDate}T00:00:00`;
-          matchesStartDate = logDateTimeStr >= startCompare;
-        }
-        if (endDate) {
-          const endCompare = endTime ? `${endDate}T${endTime}:59` : `${endDate}T23:59:59`;
-          matchesEndDate = logDateTimeStr <= endCompare;
-        }
-      }
-    }
-
-    return matchesSearch && matchesZone && matchesList && matchesStartDate && matchesEndDate;
-  });
-
-  // Calculate pagination
-  const totalItems = filteredLogs.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentLogs = filteredLogs.slice(indexOfFirstItem, indexOfLastItem);
+  const currentSelectedEvent = pageLogs.find(e => e.stt === selectedEventId) || pageLogs[0];
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 800);
+    fetchPage().finally(() => setIsRefreshing(false));
   };
+
 
   return (
                 <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -400,14 +528,16 @@ export const ReportPage = () => {
                     <RotateCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
                   </button>
                   
-                  <button 
-                    id="btn-filter"
-                    onClick={() => setShowFilterModal(true)}
-                    className={`px-3 py-1.5 bg-[#20212b] border ${showFilterModal ? 'border-[#00a2e8] text-[#00a2e8]' : 'border-[#2d2f3c] text-slate-300'} rounded hover:bg-[#2c2d3c] text-xs font-medium flex items-center space-x-1 transition`}
-                  >
-                    <Filter size={13} />
-                    <span>Lọc</span>
-                  </button>
+                  {activeTab === 'list' && (
+                    <button 
+                      id="btn-filter"
+                      onClick={() => setShowFilterModal(true)}
+                      className={`px-3 py-1.5 bg-[#20212b] border ${showFilterModal ? 'border-[#00a2e8] text-[#00a2e8]' : 'border-[#2d2f3c] text-slate-300'} rounded hover:bg-[#2c2d3c] text-xs font-medium flex items-center space-x-1 transition`}
+                    >
+                      <Filter size={13} />
+                      <span>Lọc</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -424,16 +554,19 @@ export const ReportPage = () => {
                         <input 
                           type="text"
                           placeholder="Lọc nhanh tên/mã số đối tượng..."
-                          value={searchQuery}
+                          value={appliedSearch}
                           onChange={(e) => {
-                            setSearchQuery(e.target.value);
+                            setAppliedSearch(e.target.value);
                             setCurrentPage(1); // Reset to page 1 on search
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') fetchPage();
                           }}
                           className="w-full bg-[#181921] border border-[#2a2c3a] rounded-lg pl-8 pr-3 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00a2e8]"
                         />
                         <Search className="absolute left-2.5 top-2 text-slate-500" size={13} />
-                        {searchQuery && (
-                          <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1.5 text-slate-400 hover:text-slate-200">
+                        {appliedSearch && (
+                          <button onClick={() => { setAppliedSearch(''); setCurrentPage(1); }} className="absolute right-2.5 top-1.5 text-slate-400 hover:text-slate-200">
                             <X size={14} />
                           </button>
                         )}
@@ -441,7 +574,7 @@ export const ReportPage = () => {
                       
                       {/* Active Filter Pill display */}
                       <div className="flex items-center space-x-2 text-[10px]">
-                        {(filterZone !== 'All' || filterList !== 'All' || searchQuery) && (
+                        {(appliedZone !== 'All' || appliedSearch) && (
                           <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
                             Đang lọc kết quả
                           </span>
@@ -463,48 +596,76 @@ export const ReportPage = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#1b1c24] text-xs font-mono">
-                          {currentLogs.map((log) => {
-                            const isSelected = selectedEventId === log.stt;
-                            const isTranPhuocLoi = log.ma === "010203045567";
-                            return (
-                              <tr 
-                                id={`event-row-${log.stt}`}
-                                key={log.stt}
-                                onClick={() => {
-                                  setSelectedEventId(log.stt);
-                                  setSelectedThumbIndex(0); // Reset thumbnail zoom index
-                                }}
-                                className={`cursor-pointer transition duration-150 ${
-                                  isSelected 
-                                    ? 'bg-[#005a9e] text-white hover:bg-[#0062ac]' 
-                                    : isTranPhuocLoi 
-                                      ? 'bg-amber-950/10 text-amber-200 hover:bg-[#1f202b]' 
-                                      : 'hover:bg-[#181922] odd:bg-[#0e0f14] even:bg-[#101117] text-slate-300'
-                                }`}
-                              >
-                                <td className="py-2 px-3 border-r border-[#21232d] text-center font-semibold text-slate-400">
-                                  {log.stt}
+                          {isLoadingLogs ? (
+                            Array.from({ length: itemsPerPage }).map((_, index) => (
+                              <tr key={`skeleton-${index}`} className="animate-pulse border-b border-[#21232d] hover:bg-transparent">
+                                <td className="py-2.5 px-3 border-r border-[#21232d] text-center w-12">
+                                  <div className="h-4 bg-[#1f202b] rounded-md mx-auto w-6"></div>
                                 </td>
-                                <td className={`py-2 px-3 border-r border-[#21232d] ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                                  {log.vung}
+                                <td className="py-2.5 px-3 border-r border-[#21232d]">
+                                  <div className="h-4 bg-[#1f202b] rounded-md w-28"></div>
                                 </td>
-                                <td className={`py-2 px-3 border-r border-[#21232d] font-sans font-medium ${isSelected ? 'text-white' : 'text-slate-100'}`}>
-                                  {log.ten}
+                                <td className="py-2.5 px-3 border-r border-[#21232d]">
+                                  <div className="h-4 bg-[#1f202b] rounded-md w-36"></div>
                                 </td>
-                                <td className="py-2 px-3 border-r border-[#21232d] text-slate-400">
-                                  {log.ma}
+                                <td className="py-2.5 px-3 border-r border-[#21232d]">
+                                  <div className="h-4 bg-[#1f202b] rounded-md w-24"></div>
                                 </td>
-                                <td className={`py-2 px-3 border-r border-[#21232d] font-sans ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                                  {log.danhSach}
+                                <td className="py-2.5 px-3 border-r border-[#21232d]">
+                                  <div className="h-4 bg-[#1f202b] rounded-md w-20"></div>
                                 </td>
-                                <td className="py-2 px-3 text-slate-400">
-                                  {log.thoiGian}
+                                <td className="py-2.5 px-3">
+                                  <div className="h-4 bg-[#1f202b] rounded-md w-32"></div>
                                 </td>
                               </tr>
-                            );
-                          })}
+                            ))
+                          ) : (
+                            currentLogs.map((log) => {
+                              const isSelected = selectedEventId === log.stt;
+                              const isTranPhuocLoi = log.ma === "010203045567";
+                              return (
+                                <tr 
+                                  id={`event-row-${log.stt}`}
+                                  key={log.stt}
+                                  onClick={() => {
+                                    setSelectedEventId(log.stt);
+                                    setSelectedThumbIndex(0); // Reset thumbnail zoom index
+                                  }}
+                                  className={`cursor-pointer transition duration-150 ${
+                                    isSelected 
+                                      ? 'bg-[#005a9e] text-white hover:bg-[#0062ac]' 
+                                      : isTranPhuocLoi 
+                                        ? 'bg-amber-950/10 text-amber-200 hover:bg-[#1f202b]' 
+                                        : 'hover:bg-[#181922] odd:bg-[#0e0f14] even:bg-[#101117] text-slate-300'
+                                  }`}
+                                >
+                                  <td className="py-2 px-3 border-r border-[#21232d] text-center font-semibold text-slate-400">
+                                    {log.stt}
+                                  </td>
+                                  <td className={`py-2 px-3 border-r border-[#21232d] ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                                    {log.vung}
+                                    <span className={`ml-1 text-[10px] font-sans ${isSelected ? 'text-blue-200' : 'text-slate-500'}`}>
+                                      ({getAreaSuffix(log)})
+                                    </span>
+                                  </td>
+                                  <td className={`py-2 px-3 border-r border-[#21232d] font-sans font-medium ${isSelected ? 'text-white' : 'text-slate-100'}`}>
+                                    {log.ten}
+                                  </td>
+                                  <td className="py-2 px-3 border-r border-[#21232d] text-slate-400">
+                                    {log.ma}
+                                  </td>
+                                  <td className={`py-2 px-3 border-r border-[#21232d] font-sans ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                                    {log.danhSach}
+                                  </td>
+                                  <td className="py-2 px-3 text-slate-400">
+                                    {log.thoiGian}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
 
-                          {currentLogs.length === 0 && (
+                          {!isLoadingLogs && currentLogs.length === 0 && (
                             <tr>
                               <td colSpan={6} className="py-8 text-center text-slate-500 font-sans">
                                 <AlertTriangle size={24} className="mx-auto mb-2 text-slate-600" />
@@ -519,11 +680,46 @@ export const ReportPage = () => {
                     {/* Table Status Bar & Excel Export bottom drawer */}
                     <div className="h-14 bg-[#14151c] border-t border-[#21232d] px-4 flex items-center justify-between shrink-0">
                       
-                      {/* Left helper actions */}
+                      {/* Left: items-per-page selector */}
                       <div className="flex items-center space-x-2">
-                        <button className="p-1.5 bg-[#1f202b] rounded hover:bg-[#2c2d3c] text-slate-400 hover:text-white transition" title="Cấu hình hệ thống">
-                          <Settings size={14} />
-                        </button>
+                        <div className="relative">
+                          <button
+                            onClick={() => setIsPerPageOpen(prev => !prev)}
+                            className="flex items-center space-x-1.5 px-2.5 py-1 bg-[#1f202b] rounded hover:bg-[#2c2d3c] text-slate-300 hover:text-white transition text-xs font-mono"
+                            title="Số hàng mỗi trang"
+                          >
+                            <span>{itemsPerPage} / trang</span>
+                            <ChevronDown size={11} className={`transition-transform duration-150 ${isPerPageOpen ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {isPerPageOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setIsPerPageOpen(false)}
+                              />
+                              <div className="absolute bottom-full left-0 mb-1 z-40 bg-[#1a1b25] border border-[#2d2f3e] rounded-lg shadow-xl overflow-hidden">
+                                {PER_PAGE_OPTIONS.map(opt => (
+                                  <button
+                                    key={opt}
+                                    onClick={() => {
+                                      setItemsPerPage(opt);
+                                      setCurrentPage(1);
+                                      setIsPerPageOpen(false);
+                                    }}
+                                    className={`w-full px-5 py-1.5 text-xs text-left transition whitespace-nowrap ${
+                                      opt === itemsPerPage
+                                        ? 'bg-[#00a2e8]/15 text-[#00a2e8] font-semibold'
+                                        : 'text-slate-300 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8]'
+                                    }`}
+                                  >
+                                    {opt} / trang
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       {/* Pagination: << < Page 1/3 > >> */}
@@ -578,143 +774,176 @@ export const ReportPage = () => {
                       {/* Total and Export Button */}
                       <div className="flex items-center space-x-4">
                         <div className="text-xs text-slate-400 font-sans">
-                          Tổng Số Lượng: <span className="font-bold text-slate-100 font-mono">216</span>
+                          Tổng Số Lượng: <span className="font-bold text-slate-100 font-mono">{totalItems}</span>
                         </div>
                         
-                        <button 
-                          id="btn-export-excel"
-                          onClick={handleExportExcel}
-                          disabled={exporting}
-                          className={`px-4 py-1.5 bg-[#0078d7] hover:bg-[#0069be] text-white font-medium rounded text-xs transition shadow flex items-center space-x-1.5 ${exporting ? 'opacity-70 cursor-wait' : ''}`}
-                        >
-                          <Download size={13} />
-                          <span>{exporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
-                        </button>
+                        <div className="relative group">
+                          {/* Dropup menu - visible on hover */}
+                          <div className="absolute bottom-full right-0 mb-1 hidden group-hover:flex flex-col items-stretch z-20 min-w-[170px] bg-[#1a1b25] border border-[#2d2f3e] rounded-lg shadow-xl overflow-hidden">
+                            <button
+                              id="btn-export-all"
+                              onClick={() => handleExportExcelData(filteredLogs)}
+                              disabled={exporting}
+                              className="px-4 py-2 text-xs text-slate-200 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8] flex items-center space-x-2 transition text-left whitespace-nowrap disabled:opacity-50"
+                            >
+                              <Download size={12} />
+                              <span>Xuất toàn bộ ({filteredLogs.length})</span>
+                            </button>
+                            <div className="border-t border-[#2d2f3e]" />
+                            <button
+                              id="btn-export-page"
+                              onClick={() => handleExportExcelData(currentLogs)}
+                              disabled={exporting}
+                              className="px-4 py-2 text-xs text-slate-200 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8] flex items-center space-x-2 transition text-left whitespace-nowrap disabled:opacity-50"
+                            >
+                              <Download size={12} />
+                              <span>Xuất trong trang ({currentLogs.length})</span>
+                            </button>
+                          </div>
+
+                          {/* Main export trigger button */}
+                          <button
+                            id="btn-export-excel"
+                            disabled={exporting}
+                            className={`px-4 py-1.5 bg-[#0078d7] hover:bg-[#0069be] text-white font-medium rounded text-xs transition shadow flex items-center space-x-1.5 ${exporting ? 'opacity-70 cursor-wait' : ''}`}
+                          >
+                            <Download size={13} />
+                            <span>{exporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   {/* RIGHT PANEL: CAMERA MONITOR (Replicated directly from the image) */}
                   <div id="camera-panel" className="w-[450px] bg-[#111218] flex flex-col shrink-0 overflow-y-auto">
-                    
-                    {/* Main Simulated Camera Viewport Container */}
-                    <div className="p-4 space-y-4">
-                      
-                      {/* Simulated Camera Window */}
-                      <div className="relative aspect-[4/3] bg-black rounded-lg border border-[#2d2f3e] overflow-hidden group shadow-lg">
-                        
-                        {/* Selected Person Image */}
-                        <img 
-                          src={
-                            selectedThumbIndex === 1
-                              ? resolveImageUrl((currentSelectedEvent as any).full_image_path) || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=150&h=150"
-                              : selectedThumbIndex === 0
-                                ? resolveImageUrl((currentSelectedEvent as any).face_image_path) || (currentSelectedEvent as any).faceImgBase64 || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")
-                                : (currentSelectedEvent as any).faceImgBase64 || resolveImageUrl((currentSelectedEvent as any).face_image_path) || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")
-                          } 
-                          alt="Face checkin capture"
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-contain opacity-90 transition duration-300"
-                        />
-
-                        {/* Flash effect animation */}
-                        <AnimatePresence>
-                          {flashActive && (
-                            <motion.div 
-                              initial={{ opacity: 1 }}
-                              animate={{ opacity: 0 }}
-                              className="absolute inset-0 bg-white z-40 pointer-events-none"
-                            />
-                          )}
-                        </AnimatePresence>
-
-                        {/* 2. Technical OSD details overlaid on CCTV (Only display image quality) */}
-                        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm border border-slate-700/40 px-2.5 py-1 rounded text-[10px] font-mono text-emerald-400 font-bold z-20">
-                          CHẤT LƯỢNG: <span className="text-white">1080P</span>
-                        </div>
-
-                        <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded text-[9px] font-mono text-slate-300 z-20 border border-slate-700/40">
-                          {currentSelectedEvent.thoiGian}
-                        </div>
+                    {!currentSelectedEvent ? (
+                      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                        <CameraOff size={32} className="mx-auto text-slate-600 mb-2" />
+                        <span className="text-xs font-semibold text-slate-400 block mb-1">Không có sự kiện</span>
+                        <p className="text-[11px] text-slate-500 max-w-sm mx-auto">Vui lòng chọn hoặc tải sự kiện để xem chi tiết.</p>
                       </div>
+                    ) : (
+                      /* Main Simulated Camera Viewport Container */
+                      <div className="p-4 space-y-4">
+                        
+                        {/* Simulated Camera Window */}
+                        <div className="relative aspect-[4/3] bg-black rounded-lg border border-[#2d2f3e] overflow-hidden group shadow-lg">
+                          
+                          {/* Selected Person Image */}
+                          <img 
+                            src={
+                              selectedThumbIndex === 1
+                                ? resolveImageUrl((currentSelectedEvent as any).full_image_path) || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=150&h=150"
+                                : selectedThumbIndex === 0
+                                  ? resolveImageUrl((currentSelectedEvent as any).face_image_path) || (currentSelectedEvent as any).faceImgBase64 || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")
+                                  : (currentSelectedEvent as any).faceImgBase64 || resolveImageUrl((currentSelectedEvent as any).face_image_path) || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")
+                            } 
+                            alt="Face checkin capture"
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-contain opacity-90 transition duration-300"
+                          />
 
-                      {/* 3. Thumbnails Strip Below Camera View */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {/* Selected thumbnail 1 */}
-                        <button 
-                          onClick={() => setSelectedThumbIndex(0)}
-                          className={`relative aspect-square rounded border overflow-hidden transition ${
-                            selectedThumbIndex === 0 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
-                          }`}
-                        >
-                          {(currentSelectedEvent as any).face_image_path || (currentSelectedEvent as any).faceImgBase64 || currentSelectedEvent.avatarSeed ? (
+                          {/* Flash effect animation */}
+                          <AnimatePresence>
+                            {flashActive && (
+                              <motion.div 
+                                initial={{ opacity: 1 }}
+                                animate={{ opacity: 0 }}
+                                className="absolute inset-0 bg-white z-40 pointer-events-none"
+                              />
+                            )}
+                          </AnimatePresence>
+
+                          {/* 2. Technical OSD details overlaid on CCTV (Only display image quality) */}
+                          <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm border border-slate-700/40 px-2.5 py-1 rounded text-[10px] font-mono text-emerald-400 font-bold z-20">
+                            CHẤT LƯỢNG: <span className="text-white">1080P</span>
+                          </div>
+
+                          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded text-[9px] font-mono text-slate-300 z-20 border border-slate-700/40">
+                            {currentSelectedEvent.thoiGian}
+                          </div>
+                        </div>
+
+                        {/* 3. Thumbnails Strip Below Camera View */}
+                        <div className="grid grid-cols-4 gap-2">
+                          {/* Selected thumbnail 1 */}
+                          <button 
+                            onClick={() => setSelectedThumbIndex(0)}
+                            className={`relative aspect-square rounded border overflow-hidden transition ${
+                              selectedThumbIndex === 0 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
+                            }`}
+                          >
+                            {(currentSelectedEvent as any).face_image_path || (currentSelectedEvent as any).faceImgBase64 || currentSelectedEvent.avatarSeed ? (
+                              <img 
+                                src={resolveImageUrl((currentSelectedEvent as any).face_image_path) || (currentSelectedEvent as any).faceImgBase64 || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")} 
+                                alt="Crop face close-up"
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-[#1c1d24]" />
+                            )}
+                          </button>
+
+                          {/* Thumbnail 2: Alternative scene layout */}
+                          <button 
+                            onClick={() => setSelectedThumbIndex(1)}
+                            className={`relative aspect-square rounded border overflow-hidden transition ${
+                              selectedThumbIndex === 1 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
+                            }`}
+                          >
                             <img 
-                              src={resolveImageUrl((currentSelectedEvent as any).face_image_path) || (currentSelectedEvent as any).faceImgBase64 || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")} 
-                              alt="Crop face close-up"
+                              src={resolveImageUrl((currentSelectedEvent as any).full_image_path) || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=150&h=150"} 
+                              alt="Wide background snapshot"
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-cover"
                             />
-                          ) : (
-                            <div className="w-full h-full bg-[#1c1d24]" />
-                          )}
-                        </button>
+                          </button>
 
-                        {/* Thumbnail 2: Alternative scene layout */}
-                        <button 
-                          onClick={() => setSelectedThumbIndex(1)}
-                          className={`relative aspect-square rounded border overflow-hidden transition ${
-                            selectedThumbIndex === 1 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
-                          }`}
-                        >
-                          <img 
-                            src={resolveImageUrl((currentSelectedEvent as any).full_image_path) || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=150&h=150"} 
-                            alt="Wide background snapshot"
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover"
-                          />
-                        </button>
+                          {/* Thumbnail 3: Zoomed camera frame */}
+                          <button 
+                            onClick={() => setSelectedThumbIndex(2)}
+                            className={`relative aspect-square rounded border overflow-hidden transition ${
+                              selectedThumbIndex === 2 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
+                            }`}
+                          >
+                            {(currentSelectedEvent as any).faceImgBase64 || (currentSelectedEvent as any).face_image_path || currentSelectedEvent.avatarSeed ? (
+                              <img 
+                                src={(currentSelectedEvent as any).faceImgBase64 || resolveImageUrl((currentSelectedEvent as any).face_image_path) || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")} 
+                                alt="Cropped profile view"
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover scale-150 origin-center"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-[#1c1d24]" />
+                            )}
+                          </button>
 
-                        {/* Thumbnail 3: Zoomed camera frame */}
-                        <button 
-                          onClick={() => setSelectedThumbIndex(2)}
-                          className={`relative aspect-square rounded border overflow-hidden transition ${
-                            selectedThumbIndex === 2 ? 'border-[#00a2e8] ring-1 ring-[#00a2e8]' : 'border-[#2d2f3e] hover:border-slate-500'
-                          }`}
-                        >
-                          {(currentSelectedEvent as any).faceImgBase64 || (currentSelectedEvent as any).face_image_path || currentSelectedEvent.avatarSeed ? (
-                            <img 
-                              src={(currentSelectedEvent as any).faceImgBase64 || resolveImageUrl((currentSelectedEvent as any).face_image_path) || getAvatarUrl(currentSelectedEvent.avatarSeed, currentSelectedEvent.ma === "010203045567")} 
-                              alt="Cropped profile view"
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover scale-150 origin-center"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-[#1c1d24]" />
-                          )}
-                        </button>
+                          {/* Thumbnail 4: Tải ảnh & video đính kèm */}
+                          <button 
+                            onClick={() => {
+                              alert("Đang chuẩn bị tải xuống toàn bộ tập tin hình ảnh và video đính kèm chất lượng cao...");
+                            }}
+                            className="aspect-square rounded border border-[#2d2f3e] bg-[#1c1d24] hover:bg-[#252731] hover:border-[#00a2e8] flex flex-col items-center justify-center space-y-1 transition group"
+                            title="Tải các ảnh & video đính kèm"
+                          >
+                            <Download size={18} className="text-slate-400 group-hover:text-[#00a2e8] transition" />
+                            <span className="text-[9px] text-slate-400 group-hover:text-slate-200 transition text-center leading-tight">
+                              Tải ảnh/video
+                            </span>
+                          </button>
+                        </div>
 
-                        {/* Thumbnail 4: Tải ảnh & video đính kèm */}
-                        <button 
-                          onClick={() => {
-                            alert("Đang chuẩn bị tải xuống toàn bộ tập tin hình ảnh và video đính kèm chất lượng cao...");
-                          }}
-                          className="aspect-square rounded border border-[#2d2f3e] bg-[#1c1d24] hover:bg-[#252731] hover:border-[#00a2e8] flex flex-col items-center justify-center space-y-1 transition group"
-                          title="Tải các ảnh & video đính kèm"
-                        >
-                          <Download size={18} className="text-slate-400 group-hover:text-[#00a2e8] transition" />
-                          <span className="text-[9px] text-slate-400 group-hover:text-slate-200 transition text-center leading-tight">
-                            Tải ảnh/video
-                          </span>
-                        </button>
+                        {/* Dropdown Camera Select Block (Removed) */}
                       </div>
-
-                      {/* Dropdown Camera Select Block (Removed) */}
-                    </div>
+                    )}
                   </div>
                 </div>
               ) : activeTab === 'attendance' ? (
                 /* Tab 2 Content: Báo cáo chấm công (Report Builder) */
-                <div className="flex-1 p-6 flex flex-col bg-[#0d0e12] overflow-y-auto space-y-6">
+                <div className="flex-1 p-6 flex flex-col bg-[#0d0e12] overflow-y-auto space-y-6 relative min-h-[400px]">
+                  <div className={`flex flex-col space-y-6 flex-1 transition-all duration-300 ${!showAttendanceReportDemo ? 'blur-sm pointer-events-none select-none' : ''}`}>
                   
                   {/* REPORT BUILDER CONTROLS PANEL */}
                   <div className="bg-[#14151b] border border-[#21232d] rounded-2xl p-6 shadow-2xl relative">
@@ -1151,6 +1380,25 @@ export const ReportPage = () => {
                       </table>
                     </div>
                   </div>
+                  </div>
+                  {!showAttendanceReportDemo && (
+                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0d0e12]/60 backdrop-blur-sm p-6 text-center">
+                      <div className="bg-[#14151b] border border-[#2d2f3e] p-8 rounded-2xl shadow-2xl max-w-sm flex flex-col items-center">
+                        <div className="p-3.5 bg-[#00a2e8]/10 rounded-full text-[#00a2e8] mb-4 animate-pulse">
+                          <Sparkles size={24} />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-100 mb-2">Tính năng đang được hoàn thiện</h3>
+                        <p className="text-[11px] text-slate-400 mb-6 leading-relaxed">Giao diện Báo cáo chấm công đang trong quá trình phát triển và hoàn thiện dữ liệu thực tế.</p>
+                        <button
+                          type="button"
+                          onClick={() => setShowAttendanceReportDemo(true)}
+                          className="px-5 py-2.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white rounded-xl text-xs font-bold transition shadow-lg shadow-[#00a2e8]/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          Xem bản mẫu
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Tab 3 Content: Báo cáo cuộc họp */
@@ -1385,8 +1633,7 @@ export const ReportPage = () => {
                                    console.log('SQL Query:\n', data.query);
                                    console.log('Check-in Query Parameters:\n', data.paramsCheckin);
                                    console.log('Check-out Query Parameters:\n', data.paramsCheckout);
-                                   console.log('Check-in Events Result:\n', data.checkinEvents);
-                                   console.log('Check-out Events Result:\n', data.checkoutEvents);
+                                   console.log('Attendance Aggregated Result:\n', data.attendance);
                                    console.log('------------------------------------');
                                 }
                               } catch (err) {
@@ -1596,32 +1843,14 @@ export const ReportPage = () => {
                              let entryEvent: any = null;
                              let exitEvent: any = null;
 
-                             if (meetingReportData) {
-                               // Find earliest check-in event for this person
-                               const checkins = meetingReportData.checkinEvents
-                                 .filter((evt: any) => evt.object_id === emp.id)
-                                 .sort((a: any, b: any) => new Date(a.time_created).getTime() - new Date(b.time_created).getTime());
-                               
-                               if (checkins.length > 0) {
-                                 entryEvent = checkins[0];
-                                 if (entryEvent.time_created) {
-                                   const d = new Date(entryEvent.time_created.replace('Z', ''));
-                                   thoiGianVao = d.toTimeString().split(' ')[0]; // "HH:mm:ss"
-                                 }
-                               }
-
-                               // Find latest check-out event for this person
-                               const checkouts = meetingReportData.checkoutEvents
-                                 .filter((evt: any) => evt.object_id === emp.id)
-                                 .sort((a: any, b: any) => new Date(b.time_created).getTime() - new Date(a.time_created).getTime());
-                               
-                               if (checkouts.length > 0) {
-                                 exitEvent = checkouts[0];
-                                 if (exitEvent.time_created) {
-                                   const d = new Date(exitEvent.time_created.replace('Z', ''));
-                                   thoiGianRa = d.toTimeString().split(' ')[0]; // "HH:mm:ss"
-                                 }
-                               }
+                              if (meetingReportData) {
+                                const match = meetingReportData.attendance.find((item: any) => item.employeeId === emp.id);
+                                if (match) {
+                                  thoiGianVao = match.thoiGianVao || undefined;
+                                  thoiGianRa = match.thoiGianRa || undefined;
+                                  entryEvent = match.entryEvent || null;
+                                  exitEvent = match.exitEvent || null;
+                                }
                              } else {
                                // Fallback to mock eventLogs logic
                                const empLogs = eventLogs.filter(log => {
@@ -2291,144 +2520,19 @@ export const ReportPage = () => {
                       {/* Filter inputs body (scrollable) */}
                       <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
                         
-                        {/* 1. Chế độ Tìm kiếm (Dropdown / Option selection) */}
-                        <div className="space-y-1 text-left relative">
-                          <label className="text-[11px] text-slate-300 font-semibold block">Chế độ Tìm kiếm</label>
+                        {/* 1. Mã Đối Tượng / Tên (Moved to top) */}
+                        <div className="space-y-1 text-left">
+                          <label className="text-[11px] text-slate-300 font-semibold block">Mã Đối Tượng / Tên</label>
                           <div className="relative">
-                            <button 
-                              type="button"
-                              onClick={() => setIsOpenSearchTypeDropdown(!isOpenSearchTypeDropdown)}
-                              className="w-full bg-[#181921] border border-[#2d2f3c] hover:border-[#00a2e8] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none font-semibold"
-                            >
-                              <span>{searchType === 'text' ? 'Tìm Kiếm Thường' : 'Tìm Kiếm Bằng Hình Ảnh'}</span>
-                              <ChevronDown size={14} className="text-[#00a2e8]" />
-                            </button>
-
-                            <AnimatePresence>
-                              {isOpenSearchTypeDropdown && (
-                                <motion.div 
-                                  initial={{ opacity: 0, y: 5 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: 5 }}
-                                  className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 overflow-hidden"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSearchType('text');
-                                      setIsOpenSearchTypeDropdown(false);
-                                    }}
-                                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-[#20212a] ${
-                                      searchType === 'text' ? 'text-[#00a2e8] bg-[#00a2e8]/10 font-medium' : 'text-slate-300'
-                                    }`}
-                                  >
-                                    Tìm Kiếm Thường
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSearchType('image');
-                                      setIsOpenSearchTypeDropdown(false);
-                                    }}
-                                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-[#20212a] ${
-                                      searchType === 'image' ? 'text-[#00a2e8] bg-[#00a2e8]/10 font-medium' : 'text-slate-300'
-                                    }`}
-                                  >
-                                    Tìm Kiếm Bằng Hình Ảnh
-                                  </button>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
+                            <input 
+                              type="text"
+                              placeholder="Nhập tên hoặc mã..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="w-full bg-[#181921] border border-[#2d2f3c] rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00a2e8]"
+                            />
                           </div>
                         </div>
-
-                        {/* Interactive Image Search Interface */}
-                        {searchType === 'image' && (
-                          <div className="space-y-3 p-3 bg-[#111218] rounded-lg border border-[#2d2f3c] text-left">
-                            <span className="text-[10px] text-slate-400 block font-semibold">Tải ảnh khuôn mặt đối tượng:</span>
-                            
-                            {searchImage ? (
-                              <div className="relative aspect-square w-24 mx-auto rounded-lg border border-[#00a2e8] overflow-hidden bg-black group shadow-md">
-                                <img src={searchImage} alt="Search target" className="w-full h-full object-cover" />
-                                <button 
-                                  type="button"
-                                  onClick={() => {
-                                    setSearchImage(null);
-                                    setSearchQuery('');
-                                  }}
-                                  className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full shadow transition"
-                                >
-                                  <X size={10} />
-                                </button>
-                                <div className="absolute inset-x-0 bottom-0 bg-black/85 text-[9px] text-[#00a2e8] text-center py-0.5 font-mono font-bold tracking-tight">
-                                  99.8% Match
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="border border-dashed border-[#2d2f3c] hover:border-[#00a2e8] rounded-lg p-4 text-center cursor-pointer transition bg-[#181921] relative hover:bg-[#1f202b]">
-                                <input 
-                                  type="file" 
-                                  accept="image/*"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      const reader = new FileReader();
-                                      reader.onload = (event) => {
-                                        setSearchImage(event.target?.result as string);
-                                        // Pretend we matched Phan Huu Thien Phuc
-                                        setSearchQuery('Phan Huu Thien Phuc');
-                                      };
-                                      reader.readAsDataURL(file);
-                                    }
-                                  }}
-                                  className="absolute inset-0 opacity-0 cursor-pointer"
-                                />
-                                <Camera size={20} className="mx-auto text-[#00a2e8] mb-1.5 opacity-80" />
-                                <span className="text-[10px] text-slate-400 block font-medium">Kéo thả hoặc click chọn ảnh</span>
-                              </div>
-                            )}
-
-                            {/* Threshold slider */}
-                            <div className="space-y-1.5 border-t border-[#2d2f3c]/60 pt-2.5">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] text-slate-300 font-semibold">Ngưỡng</span>
-                                <div className="flex items-center space-x-1.5">
-                                  <input 
-                                    type="number"
-                                    min="0"
-                                    max="1"
-                                    step="0.01"
-                                    value={threshold}
-                                    onChange={(e) => {
-                                      let val = parseFloat(e.target.value);
-                                      if (isNaN(val)) {
-                                        setThreshold(0);
-                                        return;
-                                      }
-                                      if (val < 0) val = 0;
-                                      if (val > 1) val = 1;
-                                      setThreshold(parseFloat(val.toFixed(2)));
-                                    }}
-                                    className="w-14 bg-[#181921] border border-[#2d2f3c] focus:border-[#00a2e8] rounded px-1.5 py-0.5 text-[11px] font-mono text-center text-white focus:outline-none"
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-[10px] text-slate-500 font-mono">0</span>
-                                <input 
-                                  type="range"
-                                  min="0"
-                                  max="1"
-                                  step="0.01"
-                                  value={threshold}
-                                  onChange={(e) => setThreshold(parseFloat(e.target.value))}
-                                  className="flex-1 h-1 bg-[#181921] border border-[#2d2f3c] rounded-lg appearance-none cursor-pointer accent-[#00a2e8]"
-                                />
-                                <span className="text-[10px] text-slate-500 font-mono">1</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
 
                         {/* 2. Từ Ngày (Time included) */}
                         <div className="space-y-1 text-left">
@@ -2526,7 +2630,7 @@ export const ReportPage = () => {
                           </div>
                         </div>
 
-                        {/* 5. Nhóm */}
+                        {/* 5. Nhóm (Real Database values) */}
                         <div className="space-y-1 text-left relative">
                           <label className="text-[11px] text-slate-300 font-semibold block">Nhóm</label>
                           <div className="relative">
@@ -2535,7 +2639,7 @@ export const ReportPage = () => {
                               onClick={() => setIsOpenListDropdown(!isOpenListDropdown)}
                               className="w-full bg-[#181921] border border-[#2d2f3c] hover:border-[#00a2e8] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none"
                             >
-                              <span>{filterList === 'All' ? 'Tất Cả' : filterList}</span>
+                              <span>{filterList === 'All' ? 'Tất Cả' : (humanGroups.find(g => g.id === filterList)?.name || filterList)}</span>
                               <ChevronDown size={14} className="text-[#00a2e8]" />
                             </button>
                             
@@ -2550,11 +2654,7 @@ export const ReportPage = () => {
                                   <div className="max-h-40 overflow-y-auto">
                                     {[
                                       { id: 'All', name: 'Tất Cả' },
-                                      { id: 'nhóm nhân viên A', name: 'nhóm nhân viên A' },
-                                      { id: 'nhóm nhân viên B', name: 'nhóm nhân viên B' },
-                                      { id: 'nhóm nhân viên C', name: 'nhóm nhân viên C' },
-                                      { id: 'nhóm nhân viên D', name: 'nhóm nhân viên D' },
-                                      { id: 'Khách hàng / Khác', name: 'Khách hàng / Khác' }
+                                      ...humanGroups
                                     ].map(listOption => (
                                       <button
                                         key={listOption.id}
@@ -2577,17 +2677,53 @@ export const ReportPage = () => {
                           </div>
                         </div>
 
-                        {/* 6. Mã Đối Tượng / Tên */}
-                        <div className="space-y-1 text-left">
-                          <label className="text-[11px] text-slate-300 font-semibold block">Mã Đối Tượng / Tên</label>
+                        {/* 6. Loại sự kiện (New dropdown option) */}
+                        <div className="space-y-1 text-left relative">
+                          <label className="text-[11px] text-slate-300 font-semibold block">Loại sự kiện</label>
                           <div className="relative">
-                            <input 
-                              type="text"
-                              placeholder="Nhập tên hoặc mã..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="w-full bg-[#181921] border border-[#2d2f3c] rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00a2e8]"
-                            />
+                            <button 
+                              type="button"
+                              onClick={() => setIsOpenEventTypeDropdown(!isOpenEventTypeDropdown)}
+                              className="w-full bg-[#181921] border border-[#2d2f3c] hover:border-[#00a2e8] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none"
+                            >
+                              <span>
+                                {filterEventType === 'All' ? 'Tất Cả' : filterEventType === 'in' ? 'Đi vào' : 'Đi ra'}
+                              </span>
+                              <ChevronDown size={14} className="text-[#00a2e8]" />
+                            </button>
+                            
+                            <AnimatePresence>
+                              {isOpenEventTypeDropdown && (
+                                <motion.div 
+                                  initial={{ opacity: 0, y: 5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: 5 }}
+                                  className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 overflow-hidden"
+                                >
+                                  <div className="max-h-40 overflow-y-auto">
+                                    {[
+                                      { id: 'All', name: 'Tất Cả' },
+                                      { id: 'in', name: 'Đi vào' },
+                                      { id: 'out', name: 'Đi ra' }
+                                    ].map(opt => (
+                                      <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setFilterEventType(opt.id as any);
+                                          setIsOpenEventTypeDropdown(false);
+                                        }}
+                                        className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-[#20212a] ${
+                                          filterEventType === opt.id ? 'text-[#00a2e8] bg-[#00a2e8]/10 font-medium' : 'text-slate-300'
+                                        }`}
+                                      >
+                                        {opt.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         </div>
 
@@ -2601,6 +2737,7 @@ export const ReportPage = () => {
                             setSearchQuery('');
                             setFilterZone('All');
                             setFilterList('All');
+                            setFilterEventType('All');
                             setStartDate('');
                             setEndDate('');
                             setStartTime('');
@@ -2609,6 +2746,15 @@ export const ReportPage = () => {
                             setSearchType('text');
                             setSearchImage(null);
                             setThreshold(0.8);
+                            setAppliedSearch('');
+                            setAppliedZone('All');
+                            setAppliedList('All');
+                            setAppliedEventType('All');
+                            setAppliedStartDate('');
+                            setAppliedEndDate('');
+                            setAppliedStartTime('');
+                            setAppliedEndTime('');
+                            setCurrentPage(1);
                           }}
                           className="px-3 py-1.5 border border-[#2d2f3c] rounded text-xs text-slate-400 hover:text-white hover:bg-[#20212a] transition font-medium"
                         >
@@ -2616,7 +2762,18 @@ export const ReportPage = () => {
                         </button>
                         <button 
                           type="button"
-                          onClick={() => setShowFilterModal(false)}
+                          onClick={() => {
+                            setAppliedSearch(searchQuery);
+                            setAppliedZone(filterZone);
+                            setAppliedList(filterList);
+                            setAppliedEventType(filterEventType);
+                            setAppliedStartDate(startDate);
+                            setAppliedEndDate(endDate);
+                            setAppliedStartTime(startTime);
+                            setAppliedEndTime(endTime);
+                            setCurrentPage(1);
+                            setShowFilterModal(false);
+                          }}
                           className="bg-[#008bc8] hover:bg-[#007cb3] text-white font-semibold text-xs py-1.5 px-6 rounded transition-all duration-200 shadow-md"
                         >
                           Tìm Kiếm

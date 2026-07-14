@@ -13,13 +13,22 @@ export class MediaController {
     // Normalize path to handle Windows forward/backward slashes
     const normalizedPath = filePath.replace(/\//g, '\\');
     
-    if (!existsSync(normalizedPath)) {
+    let finalPath = normalizedPath;
+    const localPrefix = process.env.IMAGE_LOCAL_PATH;
+    const mountPrefix = process.env.IMAGE_MOUNT_PATH;
+
+    if (localPrefix && mountPrefix && normalizedPath.toLowerCase().startsWith(localPrefix.toLowerCase())) {
+      const relativePath = normalizedPath.substring(localPrefix.length);
+      finalPath = (mountPrefix + relativePath).replace(/\\/g, '/');
+    }
+    
+    if (!existsSync(finalPath)) {
       throw new NotFoundException('Không tìm thấy file ảnh trên đĩa');
     }
     
     // Determine content type
     let contentType = 'image/jpeg';
-    const lowerPath = normalizedPath.toLowerCase();
+    const lowerPath = finalPath.toLowerCase();
     if (lowerPath.endsWith('.png')) {
       contentType = 'image/png';
     } else if (lowerPath.endsWith('.gif')) {
@@ -29,7 +38,7 @@ export class MediaController {
     }
     
     res.setHeader('Content-Type', contentType);
-    const fileStream = createReadStream(normalizedPath);
+    const fileStream = createReadStream(finalPath);
     fileStream.pipe(res);
   }
 }

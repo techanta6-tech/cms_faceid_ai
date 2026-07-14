@@ -1,0 +1,61 @@
+========================================================================
+             CÁC LỆNH THƯỜNG DÙNG ĐỂ DEPLOY HỆ THỐNG CMS FaceID
+========================================================================
+
+------------------------------------------------------------------------
+PHẦN 1: TRIỂN KHAI BACKEND (BE) VÀ NGINX VỚI DOCKER
+------------------------------------------------------------------------
+
+1. Build và khởi chạy toàn bộ dịch vụ (Backend, Nginx, Postgres):
+   docker compose up -d --build
+
+2. Dừng toàn bộ các container và giữ nguyên dữ liệu:
+   docker compose down
+
+3. Dừng toàn bộ các container và XÓA sạch volumes dữ liệu (Cẩn thận khi dùng!):
+   docker compose down -v
+
+4. Xem logs của toàn bộ hệ thống đang chạy:
+   docker compose logs -f
+
+5. Xem logs riêng của dịch vụ Backend:
+   docker compose logs -f backend
+
+6. Xem logs riêng của dịch vụ Nginx:
+   docker compose logs -f nginx
+
+7. Kiểm tra trạng thái hoạt động của các Container:
+   docker compose ps
+
+8. Thực thi lệnh generate Prisma client bên trong container Backend:
+   docker compose exec backend yarn workspace backend prisma:generate
+
+9. Reset cơ sở dữ liệu hoặc đẩy cấu trúc schema mới vào DB bên trong Docker:
+   docker compose exec backend yarn workspace backend prisma db push
+
+10. Vào terminal bash bên trong container backend để kiểm tra file:
+    docker compose exec backend sh
+
+
+------------------------------------------------------------------------
+PHẦN 2: ĐÓNG GÓI VÀ CHẠY FRONTEND (FE) VỚI ELECTRON
+------------------------------------------------------------------------
+
+* Lưu ý: Thực hiện các lệnh sau tại thư mục gốc (root) của dự án.
+
+1. Cài đặt các dependencies mới (bao gồm electron và electron-builder):
+   yarn install
+
+2. Chạy Electron ở môi trường Phát triển (Development):
+   - Bước 1: Khởi động Vite dev server trước ở một terminal:
+     yarn dev:frontend
+   - Bước 2: Ở một terminal khác, thiết lập biến môi trường và chạy Electron:
+     $env:NODE_ENV="development"; yarn workspace frontend electron:dev
+
+3. Build và đóng gói ứng dụng Electron cho Production (cho cả Windows và Linux):
+   yarn workspace frontend electron:build
+
+4. Sau khi build hoàn thành, file cài đặt sẽ nằm ở thư mục:
+   apps/frontend/dist-electron/
+   - File cài đặt cho Windows: .exe (VD: CMS FaceID Setup x.x.x.exe)
+   - File cài đặt cho Linux: .deb hoặc .AppImage

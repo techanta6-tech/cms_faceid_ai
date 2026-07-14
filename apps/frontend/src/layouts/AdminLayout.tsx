@@ -21,7 +21,7 @@ export const AdminLayout: React.FC = () => {
               <Monitor size={18} className="animate-pulse" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-100 tracking-tight">Hệ Thống AI FACEID</h2>
+              <h2 className="text-sm font-bold text-slate-100 tracking-tight">Hệ Thống AI FaceID</h2>
               <p className={`text-[10px] font-medium flex items-center gap-1.5 ${isConnected ? 'text-emerald-400' : 'text-rose-500'}`}>
                 <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
                 {isConnected ? 'Máy chủ trực tuyến' : 'Mất kết nối WS'}

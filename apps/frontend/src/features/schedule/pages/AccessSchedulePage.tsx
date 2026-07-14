@@ -10,7 +10,8 @@ import {
   X,
   FolderOpen,
   Loader2,
-  Trash2
+  Trash2,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../../../context/AppContext';
@@ -84,6 +85,7 @@ export const AccessSchedulePage = () => {
   }, [meetings, areasData]);
 
   const [activeScheduleSubTab, setActiveScheduleSubTab] = useState<'attendance-schedule' | 'meeting-schedule'>('attendance-schedule');
+  const [showAttendanceScheduleDemo, setShowAttendanceScheduleDemo] = useState(false);
 
   // States cho xếp ca chấm công
   const [scheduleDisplay, setScheduleDisplay] = useState<'Ngày' | 'Tuần' | 'Tháng' | 'Năm'>('Ngày');
@@ -488,7 +490,8 @@ export const AccessSchedulePage = () => {
 
         {/* Body Content: Lịch biểu Chấm công (Interactive Builder) or Lịch họp (Bỏ trống) */}
         {activeScheduleSubTab === 'attendance-schedule' ? (
-          <div className="flex-1 p-6 flex flex-col bg-[#0d0e12] overflow-y-auto space-y-5">
+          <div className="flex-1 p-6 flex flex-col bg-[#0d0e12] overflow-y-auto space-y-5 relative min-h-[400px]">
+            <div className={`flex flex-col space-y-5 flex-1 transition-all duration-300 ${!showAttendanceScheduleDemo ? 'blur-sm pointer-events-none select-none' : ''}`}>
             {/* REPORT BUILDER-LIKE CONTROLS GRID */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
@@ -1474,6 +1477,25 @@ export const AccessSchedulePage = () => {
               </div>
             )}
 
+            </div>
+            {!showAttendanceScheduleDemo && (
+              <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0d0e12]/60 backdrop-blur-sm p-6 text-center">
+                <div className="bg-[#14151b] border border-[#2d2f3c] p-8 rounded-2xl shadow-2xl max-w-sm flex flex-col items-center">
+                  <div className="p-3.5 bg-[#00a2e8]/10 rounded-full text-[#00a2e8] mb-4 animate-pulse">
+                    <Sparkles size={24} />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-100 mb-2">Tính năng đang được hoàn thiện</h3>
+                  <p className="text-[11px] text-slate-400 mb-6 leading-relaxed">Giao diện xếp ca lịch chấm công đang trong quá trình phát triển hoàn chỉnh.</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAttendanceScheduleDemo(true)}
+                    className="px-5 py-2.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white rounded-xl text-xs font-bold transition shadow-lg shadow-[#00a2e8]/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    Xem bản mẫu
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           /* CONDITIONAL VIEW: QUẢN LÝ LỊCH HỌP (Interactive Meeting Schedule Builder & Drag Day Timeline) */
@@ -1515,7 +1537,7 @@ export const AccessSchedulePage = () => {
                                 Chỉ dùng để chọn các khu vực sẽ được thêm cuộc họp vào khi nhấn "Tạo cuộc họp",
                                 không dùng để lọc hiển thị bảng lịch bên dưới. */}
                             <div className="space-y-1.5 text-left relative">
-                              <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Khu vực / Phòng họp áp dụng (Multiselect)</label>
+                              <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Khu vực / Phòng họp áp dụng</label>
                               <div className="relative">
                                 <button
                                   type="button"
@@ -1601,7 +1623,7 @@ export const AccessSchedulePage = () => {
 
                             {/* Multiselect nhóm nhân viên - load từ human_list thật (humanGroups) */}
                             <div className="space-y-1.5 text-left relative">
-                              <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">nhóm nhân viên tham gia (Multiselect)</label>
+                              <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">nhóm nhân viên tham gia</label>
                               <div className="relative">
                                 <button
                                   type="button"

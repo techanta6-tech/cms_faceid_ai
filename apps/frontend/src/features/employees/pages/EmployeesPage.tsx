@@ -63,7 +63,7 @@ export const EmployeesPage = () => {
       const formatDate = (dateVal: any) => {
         if (!dateVal) return '';
         const d = new Date(dateVal);
-        return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
       };
       setEmployees(
         (humans as any[]).map((h) => ({
@@ -94,6 +94,7 @@ export const EmployeesPage = () => {
   }, []);
   const [newDepartmentInput, setNewDepartmentInput] = useState('');
   const [showEmployeeSaveToast, setShowEmployeeSaveToast] = useState<boolean>(false);
+  const [showAddGroupDemo, setShowAddGroupDemo] = useState(false);
 
   interface NewEmployee {
     id: string;
@@ -216,8 +217,8 @@ export const EmployeesPage = () => {
               id="tab-btn-employee-manage"
               onClick={() => setActiveEmployeeSubTab('employees-list')}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all duration-200 cursor-pointer ${activeEmployeeSubTab === 'employees-list'
-                  ? 'bg-[#00a2e8]/10 text-[#00a2e8] shadow-lg shadow-[#00a2e8]/10'
-                  : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#00a2e8]/10 text-[#00a2e8] shadow-lg shadow-[#00a2e8]/10'
+                : 'text-slate-400 hover:text-slate-200'
                 }`}
             >
               <Users size={14} />
@@ -229,8 +230,8 @@ export const EmployeesPage = () => {
               id="tab-btn-department-manage"
               onClick={() => setActiveEmployeeSubTab('humanGroups-list')}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all duration-200 cursor-pointer ${activeEmployeeSubTab === 'humanGroups-list'
-                  ? 'bg-[#00a2e8]/10 text-[#00a2e8] shadow-lg shadow-[#00a2e8]/10'
-                  : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#00a2e8]/10 text-[#00a2e8] shadow-lg shadow-[#00a2e8]/10'
+                : 'text-slate-400 hover:text-slate-200'
                 }`}
             >
               <Layers size={14} />
@@ -238,7 +239,7 @@ export const EmployeesPage = () => {
             </button>
 
             {/* Tab 3: Thêm nhân viên */}
-            <button
+            {/* <button
               id="tab-btn-add-employee"
               onClick={() => {
                 setNewEmployees([createEmptyNewEmployee()]);
@@ -251,7 +252,7 @@ export const EmployeesPage = () => {
             >
               <Plus size={14} />
               <span>Thêm nhân viên</span>
-            </button>
+            </button> */}
           </div>
         </div>
       </div>
@@ -272,7 +273,7 @@ export const EmployeesPage = () => {
               </div>
 
               {/* Button Thêm nhân viên */}
-              <button
+              {/* <button
                 onClick={() => {
                   setNewEmployees([createEmptyNewEmployee()]);
                   setActiveEmployeeSubTab('add-employee');
@@ -281,11 +282,7 @@ export const EmployeesPage = () => {
               >
                 <Plus size={14} />
                 <span>Thêm nhân viên</span>
-              </button>
-            </div>
-
-            {/* Toolbar: nút Refresh phía trên bảng */}
-            <div className="flex items-center justify-end">
+              </button> */}
               <button
                 onClick={fetchEmployees}
                 disabled={isRefreshingEmployees}
@@ -295,6 +292,11 @@ export const EmployeesPage = () => {
                 <RefreshCw size={12} className={isRefreshingEmployees ? 'animate-spin' : ''} />
                 <span>Refresh</span>
               </button>
+            </div>
+
+            {/* Toolbar: nút Refresh phía trên bảng */}
+            <div className="flex items-center justify-end">
+
             </div>
 
             {/* Employees list table/cards */}
@@ -499,8 +501,8 @@ export const EmployeesPage = () => {
                                 updateNewEmployee(index, 'human_group', updatedHumanGroup);
                               }}
                               className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${isSelected
-                                  ? 'bg-[#00a2e8]/15 text-[#00a2e8] border-[#00a2e8]/50'
-                                  : 'bg-[#14151c] text-slate-400 border-[#2d2f3c] hover:border-slate-500'
+                                ? 'bg-[#00a2e8]/15 text-[#00a2e8] border-[#00a2e8]/50'
+                                : 'bg-[#14151c] text-slate-400 border-[#2d2f3c] hover:border-slate-500'
                                 }`}
                             >
                               {dep.name}
@@ -568,8 +570,8 @@ export const EmployeesPage = () => {
                                 type="button"
                                 onClick={() => updateNewEmployee(index, 'gioiTinh', gender)}
                                 className={`py-1.5 border rounded-xl text-xs font-semibold transition cursor-pointer ${emp.gioiTinh === gender
-                                    ? 'bg-[#00a2e8]/10 text-[#00a2e8] border-[#00a2e8]'
-                                    : 'bg-[#1c1d26] text-slate-400 border-[#2d2f3c] hover:border-slate-500'
+                                  ? 'bg-[#00a2e8]/10 text-[#00a2e8] border-[#00a2e8]'
+                                  : 'bg-[#1c1d26] text-slate-400 border-[#2d2f3c] hover:border-slate-500'
                                   }`}
                               >
                                 {gender}
@@ -889,48 +891,69 @@ export const EmployeesPage = () => {
             </div>
 
             {/* Right Panel: nhóm nhân viên builder */}
-            <div className="md:col-span-5 bg-[#14151b] border border-[#21232d] rounded-2xl p-5 shadow-xl">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-5 pb-2 border-b border-slate-800/60 flex items-center space-x-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#00a2e8]" />
-                <span>nhóm nhân viên builder</span>
-              </h4>
+            <div className="md:col-span-5 bg-[#14151b] border border-[#21232d] rounded-2xl p-5 shadow-xl relative min-h-[220px] overflow-hidden">
+              <div className={`transition-all duration-300 ${!showAddGroupDemo ? 'blur-sm pointer-events-none select-none' : ''}`}>
+                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-5 pb-2 border-b border-slate-800/60 flex items-center space-x-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00a2e8]" />
+                  <span>nhóm nhân viên builder</span>
+                </h4>
 
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!newDepartmentInput.trim()) {
-                    alert('tên nhóm nhân viên không được để trống!');
-                    return;
-                  }
-                  if (humanGroups.some(d => d.name.toLowerCase() === newDepartmentInput.trim().toLowerCase())) {
-                    alert('Nhóm nhân viên này đã tồn tại!');
-                    return;
-                  }
-                  // Tạo mới chỉ cập nhật local state (chưa có API endpoint)
-                  setHumanGroups([...humanGroups, { id: `local-${Date.now()}`, name: newDepartmentInput.trim() }]);
-                  setNewDepartmentInput('');
-                }}
-                className="space-y-4"
-              >
-                <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">tên nhóm nhân viên</label>
-                  <input
-                    type="text"
-                    value={newDepartmentInput}
-                    onChange={(e) => setNewDepartmentInput(e.target.value)}
-                    placeholder="Nhập tên nhóm nhân viên mới..."
-                    className="w-full bg-[#1c1d26] border border-[#2d2f3c] focus:border-[#00a2e8] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none transition-all h-[42px]"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white rounded-xl text-xs font-bold transition shadow-lg shadow-[#00a2e8]/20 cursor-pointer flex items-center justify-center space-x-2"
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newDepartmentInput.trim()) {
+                      alert('tên nhóm nhân viên không được để trống!');
+                      return;
+                    }
+                    if (humanGroups.some(d => d.name.toLowerCase() === newDepartmentInput.trim().toLowerCase())) {
+                      alert('Nhóm nhân viên này đã tồn tại!');
+                      return;
+                    }
+                    // Tạo mới chỉ cập nhật local state (chưa có API endpoint)
+                    setHumanGroups([...humanGroups, { id: `local-${Date.now()}`, name: newDepartmentInput.trim() }]);
+                    setNewDepartmentInput('');
+                  }}
+                  className="space-y-4"
                 >
-                  <Plus size={14} />
-                  <span>tạo nhóm nhân viên</span>
-                </button>
-              </form>
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">tên nhóm nhân viên</label>
+                    <input
+                      type="text"
+                      value={newDepartmentInput}
+                      onChange={(e) => setNewDepartmentInput(e.target.value)}
+                      placeholder="Nhập tên nhóm nhân viên mới..."
+                      className="w-full bg-[#1c1d26] border border-[#2d2f3c] focus:border-[#00a2e8] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none transition-all h-[42px]"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white rounded-xl text-xs font-bold transition shadow-lg shadow-[#00a2e8]/20 cursor-pointer flex items-center justify-center space-x-2"
+                  >
+                    <Plus size={14} />
+                    <span>tạo nhóm nhân viên</span>
+                  </button>
+                </form>
+              </div>
+
+              {!showAddGroupDemo && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#14151b]/80 backdrop-blur-xs p-4 text-center">
+                  <div className="flex flex-col items-center max-w-[240px]">
+                    <div className="p-2 bg-[#00a2e8]/10 rounded-full text-[#00a2e8] mb-2 animate-pulse">
+                      <Sparkles size={16} />
+                    </div>
+                    <h5 className="text-[11px] font-bold text-slate-100 mb-1">Tính năng đang được hoàn thiện</h5>
+                    <p className="text-[10px] text-slate-400 mb-3 leading-tight">Chức năng thêm nhóm nhân sự đang trong quá trình phát triển hoàn chỉnh.</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddGroupDemo(true)}
+                      className="px-4 py-1.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white rounded-lg text-[10px] font-bold transition shadow-md shadow-[#00a2e8]/10 flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      Xem bản mẫu
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>

@@ -1,6 +1,8 @@
 export interface EventLog {
   stt: number;
+  id?: string;
   vung: string;
+  camera_id?: string;
   ten: string;
   ma: string;
   danhSach: string;

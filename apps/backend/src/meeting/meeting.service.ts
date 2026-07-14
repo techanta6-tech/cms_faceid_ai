@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import * as XLSX from 'xlsx';
 import {
   BadRequestException,
   Injectable,
@@ -334,36 +335,231 @@ export class MeetingService {
     const checkinEvents = checkinEventsRaw.map(mapEvent);
     const checkoutEvents = checkoutEventsRaw.map(mapEvent);
 
+    const attendanceMap = new Map<string, {
+      employeeId: string;
+      thoiGianVao: string | null;
+      thoiGianRa: string | null;
+      entryEvent: any;
+      exitEvent: any;
+    }>();
+
+    const extractLocalTimeStr = (dateVal: Date | string): string | null => {
+      const formatted = this.formatDateToLocalString(dateVal);
+      if (!formatted) return null;
+      return formatted.split('-')[1] || null;
+    };
+
+    // 1. Process check-ins: find earliest check-in for each object_id
+    const checkinsByEmp = new Map<string, any[]>();
+    for (const evt of checkinEvents) {
+      const empId = evt.object_id;
+      if (!checkinsByEmp.has(empId)) {
+        checkinsByEmp.set(empId, []);
+      }
+      checkinsByEmp.get(empId)!.push(evt);
+    }
+
+    for (const [empId, evts] of checkinsByEmp.entries()) {
+      evts.sort((a, b) => new Date(a.time_created).getTime() - new Date(b.time_created).getTime());
+      const earliest = evts[0];
+      attendanceMap.set(empId, {
+        employeeId: empId,
+        thoiGianVao: earliest.time_created ? extractLocalTimeStr(earliest.time_created) : null,
+        thoiGianRa: null,
+        entryEvent: earliest,
+        exitEvent: null,
+      });
+    }
+
+    // 2. Process check-outs: find latest check-out for each object_id
+    const checkoutsByEmp = new Map<string, any[]>();
+    for (const evt of checkoutEvents) {
+      const empId = evt.object_id;
+      if (!checkoutsByEmp.has(empId)) {
+        checkoutsByEmp.set(empId, []);
+      }
+      checkoutsByEmp.get(empId)!.push(evt);
+    }
+
+    for (const [empId, evts] of checkoutsByEmp.entries()) {
+      evts.sort((a, b) => new Date(b.time_created).getTime() - new Date(a.time_created).getTime());
+      const latest = evts[0];
+      
+      let item = attendanceMap.get(empId);
+      if (!item) {
+        item = {
+          employeeId: empId,
+          thoiGianVao: null,
+          thoiGianRa: null,
+          entryEvent: null,
+          exitEvent: latest,
+        };
+        attendanceMap.set(empId, item);
+      } else {
+        item.thoiGianRa = latest.time_created ? extractLocalTimeStr(latest.time_created) : null;
+        item.exitEvent = latest;
+      }
+    }
+
+    const attendance = Array.from(attendanceMap.values());
+
     return {
-      checkinEvents,
-      checkoutEvents,
+      attendance,
       query,
       paramsCheckin: { startTime, endTime, checkinCameraIds, group_ids: meeting.group_ids },
       paramsCheckout: { startTime, endTime, checkoutCameraIds, group_ids: meeting.group_ids }
     };
   }
 
-  async getEventLogs() {
+
+  // ──────────────────────────────────────────────
+  // Shared helpers: list-map & camera→location map
+  // ──────────────────────────────────────────────
+  private async buildLookupMaps() {
     const lists = await this.lcms.human_list.findMany({
       where: { is_deleted: { not: true } },
       select: { id: true, name: true }
     });
     const listMap = new Map<string, string>(lists.map(l => [l.id, l.name]));
 
-    const binds = await this.cms.location_camera_bind.findMany({
-      include: {
-        location: true
-      }
-    });
+    const binds = await this.cms.location_camera_bind.findMany({ include: { location: true } });
     const locationNameByCameraId = new Map<string, string>();
     for (const bind of binds) {
       if (bind.camera_id && bind.location) {
         locationNameByCameraId.set(bind.camera_id, bind.location.name);
       }
     }
+    return { listMap, locationNameByCameraId };
+  }
 
-    const query = `
-      SELECT 
+  private buildEventConditions(
+    opts: {
+      search?: string; zone?: string; startDate?: string;
+      endDate?: string; startTime?: string; endTime?: string;
+      group?: string;
+    },
+    cameraIds?: string[]
+  ): string {
+    const parts: string[] = [
+      `ev.is_valid = true`,
+      `ev.is_deleted = false`,
+    ];
+    if (opts.startDate) {
+      const t = opts.startTime ? `${opts.startDate} ${opts.startTime}:00` : `${opts.startDate} 00:00:00`;
+      parts.push(`ev.create_time >= (TIMESTAMP '${t}')`);
+    }
+    if (opts.endDate) {
+      const t = opts.endTime ? `${opts.endDate} ${opts.endTime}:59` : `${opts.endDate} 23:59:59`;
+      parts.push(`ev.create_time <= (TIMESTAMP '${t}')`);
+    }
+    if (opts.search) {
+      const s = opts.search.replace(/'/g, "''");
+      parts.push(`(h.full_name ILIKE '%${s}%' OR h.document_id ILIKE '%${s}%')`);
+    }
+    if (opts.zone && opts.zone !== 'All') {
+      const z = opts.zone.replace(/'/g, "''");
+      parts.push(`(ca.area_name ILIKE '%${z}%')`);
+    }
+    if (opts.group && opts.group !== 'All') {
+      const g = opts.group.replace(/'/g, "''");
+      parts.push(`('${g}' = ANY(h.list_ids))`);
+    }
+    if (cameraIds) {
+      if (cameraIds.length > 0) {
+        const list = cameraIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
+        parts.push(`es.camera_event_id IN (${list})`);
+      } else {
+        parts.push(`1 = 0`);
+      }
+    }
+    return parts.join(' AND ');
+  }
+
+  private formatDateToLocalString(date: Date | string | null | undefined): string {
+    if (!date) return '';
+    const d = new Date(date);
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const year = d.getUTCFullYear();
+    const hour = String(d.getUTCHours()).padStart(2, '0');
+    const minute = String(d.getUTCMinutes()).padStart(2, '0');
+    const second = String(d.getUTCSeconds()).padStart(2, '0');
+    return `${day}/${month}/${year}-${hour}:${minute}:${second}`;
+  }
+
+  private mapRawEvent(e: any, index: number, listMap: Map<string, string>, locationNameByCameraId: Map<string, string>, pageOffset = 0) {
+    let faceImgBase64: string | null = null;
+    if (e.cropped_face_images) {
+      const buffers = e.cropped_face_images;
+      if (Array.isArray(buffers) && buffers.length > 0) {
+        const buf = buffers[0];
+        if (buf) {
+          const rawBuf = Buffer.isBuffer(buf) ? buf : (buf.data ? Buffer.from(buf.data) : null);
+          if (rawBuf) faceImgBase64 = `data:image/jpeg;base64,${rawBuf.toString('base64')}`;
+        }
+      } else if (Buffer.isBuffer(buffers)) {
+        faceImgBase64 = `data:image/jpeg;base64,${buffers.toString('base64')}`;
+      }
+    }
+
+    const thoiGianStr = this.formatDateToLocalString(e.time_created);
+
+    const pb = (e.list_ids || []).map((lid: string) => listMap.get(lid) || lid);
+    const groupStr = pb.join(', ') || 'Mặc định';
+    const areaName = e.camera_event_id ? locationNameByCameraId.get(e.camera_event_id) : undefined;
+    const displayArea = areaName || e.area_name || 'Không xác định';
+
+    return {
+      stt: pageOffset + index + 1,
+      id: e.event_id,
+      vung: displayArea,
+      camera_id: e.camera_event_id,
+      ten: e.full_name || 'Không tên',
+      ma: e.document_id || e.object_id || '',
+      danhSach: groupStr,
+      thoiGian: thoiGianStr,
+      avatarSeed: '',
+      faceImgBase64,
+      face_image_path: e.face_image_path,
+      full_image_path: e.full_image_path,
+      accuracy: 95.0
+    };
+  }
+
+  async getEventLogs(opts: {
+    page?: number; limit?: number; search?: string; zone?: string;
+    startDate?: string; endDate?: string; startTime?: string; endTime?: string;
+    group?: string; eventType?: string;
+  } = {}) {
+    const page   = Math.max(1, opts.page   || 1);
+    const limit  = Math.min(500, Math.max(1, opts.limit || 10));
+    const offset = (page - 1) * limit;
+
+    const { listMap, locationNameByCameraId } = await this.buildLookupMaps();
+
+    let cameraIds: string[] | undefined = undefined;
+    if (opts.eventType && opts.eventType !== 'All') {
+      const binds = await this.cms.location_camera_bind.findMany({
+        select: { camera_id: true, role: true }
+      });
+      cameraIds = binds
+        .filter(b => b.role.includes(opts.eventType === 'in' ? 'checkin' : 'checkout'))
+        .map(b => b.camera_id)
+        .filter(Boolean);
+    }
+
+    const where = this.buildEventConditions(opts, cameraIds);
+
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM event_vms_parent ev
+      INNER JOIN event_statistic_parent es ON ev.source_id = es.id
+      INNER JOIN human_info h             ON es.object_id = h.id
+      LEFT  JOIN camera_area_event_source ca ON es.source_id = ca.area_id
+      WHERE ${where};
+    `;
+    const dataQuery = `
+      SELECT
           ev.id AS event_id,
           es.object_id,
           es.camera_event_id,
@@ -377,84 +573,85 @@ export class MeetingService {
           ei_full.image_path AS full_image_path,
           ei_face.image_path AS face_image_path
       FROM event_vms_parent ev
-      INNER JOIN event_statistic_parent es 
-          ON ev.source_id = es.id
-      INNER JOIN human_info h 
-          ON es.object_id = h.id
-      LEFT JOIN camera_area_event_source ca 
-          ON es.source_id = ca.area_id
-      LEFT JOIN event_image_parent ei_full
-          ON ev.source_id = ei_full.statistic_id AND ei_full.type = 1
-      LEFT JOIN event_image_parent ei_face
-          ON ev.source_id = ei_face.statistic_id AND ei_face.type = 4
-      WHERE 
-          ev.is_valid = true 
-          AND ev.is_deleted = false
+      INNER JOIN event_statistic_parent es ON ev.source_id = es.id
+      INNER JOIN human_info h             ON es.object_id = h.id
+      LEFT  JOIN camera_area_event_source ca ON es.source_id = ca.area_id
+      LEFT  JOIN event_image_parent ei_full  ON ev.source_id = ei_full.statistic_id AND ei_full.type = 1
+      LEFT  JOIN event_image_parent ei_face  ON ev.source_id = ei_face.statistic_id AND ei_face.type = 4
+      WHERE ${where}
       ORDER BY ev.create_time DESC
-      LIMIT 100;
+      LIMIT ${limit} OFFSET ${offset};
     `;
 
-    const rawEvents = await this.lcms.$queryRawUnsafe<any[]>(query);
+    const [countRows, rawEvents] = await Promise.all([
+      this.lcms.$queryRawUnsafe<any[]>(countQuery),
+      this.lcms.$queryRawUnsafe<any[]>(dataQuery),
+    ]);
 
-    const mapEvent = (e: any, index: number) => {
-      let faceImgBase64: string | null = null;
-      if (e.cropped_face_images) {
-        const buffers = e.cropped_face_images;
-        if (Array.isArray(buffers) && buffers.length > 0) {
-          const buf = buffers[0];
-          if (buf) {
-            const rawBuf = Buffer.isBuffer(buf) ? buf : (buf.data ? Buffer.from(buf.data) : null);
-            if (rawBuf) {
-              faceImgBase64 = `data:image/jpeg;base64,${rawBuf.toString('base64')}`;
-            }
-          }
-        } else if (Buffer.isBuffer(buffers)) {
-          faceImgBase64 = `data:image/jpeg;base64,${buffers.toString('base64')}`;
-        }
-      }
+    const total = parseInt(countRows[0]?.total ?? '0', 10);
+    const data  = rawEvents.map((e, idx) => this.mapRawEvent(e, idx, listMap, locationNameByCameraId, offset));
 
-      let thoiGianStr = '';
-      if (e.time_created) {
-        const d = new Date(e.time_created);
-        d.setHours(d.getHours() + 7);
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        const hour = String(d.getHours()).padStart(2, '0');
-        const minute = String(d.getMinutes()).padStart(2, '0');
-        const second = String(d.getSeconds()).padStart(2, '0');
-        thoiGianStr = `${day}/${month}/${year}-${hour}:${minute}:${second}`;
-      }
+    return { data, total, page, limit };
+  }
 
-      const pb = (e.list_ids || []).map((lid: string) => listMap.get(lid) || lid);
-      const groupStr = pb.join(', ') || 'Mặc định';
+  async getEventLogIds(opts: {
+    page?: number; limit?: number; search?: string; zone?: string;
+    startDate?: string; endDate?: string; startTime?: string; endTime?: string;
+    group?: string; eventType?: string;
+  } = {}) {
+    const page   = Math.max(1, opts.page   || 1);
+    const limit  = Math.min(500, Math.max(1, opts.limit || 10));
+    const offset = (page - 1) * limit;
 
-      const areaName = e.camera_event_id ? locationNameByCameraId.get(e.camera_event_id) : undefined;
-      const displayArea = areaName || e.area_name || 'Không xác định';
+    let cameraIds: string[] | undefined = undefined;
+    if (opts.eventType && opts.eventType !== 'All') {
+      const binds = await this.cms.location_camera_bind.findMany({
+        select: { camera_id: true, role: true }
+      });
+      cameraIds = binds
+        .filter(b => b.role.includes(opts.eventType === 'in' ? 'checkin' : 'checkout'))
+        .map(b => b.camera_id)
+        .filter(Boolean);
+    }
 
-      return {
-        stt: index + 1,
-        id: e.event_id,
-        vung: displayArea,
-        ten: e.full_name || 'Không tên',
-        ma: e.document_id || e.object_id || '',
-        danhSach: groupStr,
-        thoiGian: thoiGianStr,
-        avatarSeed: '',
-        faceImgBase64,
-        face_image_path: e.face_image_path,
-        full_image_path: e.full_image_path,
-        accuracy: 95.0
-      };
-    };
-    const result = rawEvents.map((e, idx) => mapEvent(e, idx));
-    console.log('--- EVENT LOGS QUERY RESULT ---');
-    console.log(`Total events fetched: ${result.length}`);
-    console.log(result.slice(0, 10).map(r => ({
-      ...r,
-      faceImgBase64: r.faceImgBase64 ? `${r.faceImgBase64.substring(0, 50)}... [truncated]` : null
-    })));
-    console.log('--------------------------------');
-    return result;
+    const where = this.buildEventConditions(opts, cameraIds);
+    const query = `
+      SELECT ev.id AS event_id
+      FROM event_vms_parent ev
+      INNER JOIN event_statistic_parent es ON ev.source_id = es.id
+      INNER JOIN human_info h             ON es.object_id = h.id
+      LEFT  JOIN camera_area_event_source ca ON es.source_id = ca.area_id
+      WHERE ${where}
+      ORDER BY ev.create_time DESC
+      LIMIT ${limit} OFFSET ${offset};
+    `;
+    const rows = await this.lcms.$queryRawUnsafe<any[]>(query);
+    return rows.map(r => r.event_id);
+  }
+
+  async exportExcel(data: any[], res: any) {
+    if (!Array.isArray(data)) {
+      data = [];
+    }
+
+    const formattedRows = data.map((item) => ({
+      'STT': item.stt,
+      'Khu vực': item.vung || '',
+      'Họ và tên': item.ten || '',
+      'Mã nhân viên': item.ma || '',
+      'Phòng ban/Danh sách': item.danhSach || '',
+      'Thời gian': item.thoiGian || '',
+      'Độ chính xác (%)': item.accuracy || 95.0
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(formattedRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'DanhSachSuKien');
+
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Disposition', 'attachment; filename="DanhSachSuKien.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
   }
 }

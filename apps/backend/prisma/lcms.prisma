@@ -1,11 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/lcms"
+  provider      = "prisma-client-js"
+  output        = "../generated/lcms"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:@localhost:5433/lcms_server?connect_timeout=15&pooling=true&minpoolsize=0&maxpoolsize=200"
+  url      = env("LCMS_DATABASE_URL")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

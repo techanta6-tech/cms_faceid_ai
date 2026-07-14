@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+/apps/frontend/dist-electron
+/apps/backend/generated
+/apps/backend/generated
+/apps/backend/generated
