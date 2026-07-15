@@ -84,7 +84,7 @@ export const AccessSchedulePage = () => {
     setLocalMeetings(meetings.map(m => mapMeetingToLocal(m, areasData)));
   }, [meetings, areasData]);
 
-  const [activeScheduleSubTab, setActiveScheduleSubTab] = useState<'attendance-schedule' | 'meeting-schedule'>('meeting-schedule');
+  const [activeScheduleSubTab, setActiveScheduleSubTab] = useState<'attendance-schedule' | 'meeting-schedule'>('attendance-schedule');
   const [showAttendanceScheduleDemo, setShowAttendanceScheduleDemo] = useState(false);
 
   // States cho xếp ca chấm công
@@ -459,20 +459,7 @@ export const AccessSchedulePage = () => {
 
             {/* Sliding Big Pill Segmented Control Container */}
             <div className="flex bg-[#111218] p-1 rounded-full border border-[#2d2f3c] space-x-1">
-              {/* Tab 1: Quản lý lịch họp */}
-              <button
-                id="schedule-tab-btn-meeting"
-                onClick={() => setActiveScheduleSubTab('meeting-schedule')}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all duration-200 cursor-pointer ${activeScheduleSubTab === 'meeting-schedule'
-                  ? 'bg-[#0078d7] text-white shadow-lg shadow-[#0078d7]/20'
-                  : 'text-slate-400 hover:text-slate-200'
-                  }`}
-              >
-                <Clock size={14} />
-                <span>Quản lý lịch họp</span>
-              </button>
-
-              {/* Tab 2: Quản lý lịch chấm công */}
+              {/* Tab 1: Quản lý lịch chấm công */}
               <button
                 id="schedule-tab-btn-attendance"
                 onClick={() => setActiveScheduleSubTab('attendance-schedule')}
@@ -483,6 +470,19 @@ export const AccessSchedulePage = () => {
               >
                 <Calendar size={14} />
                 <span>Quản lý lịch chấm công</span>
+              </button>
+
+              {/* Tab 2: Quản lý lịch họp */}
+              <button
+                id="schedule-tab-btn-meeting"
+                onClick={() => setActiveScheduleSubTab('meeting-schedule')}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all duration-200 cursor-pointer ${activeScheduleSubTab === 'meeting-schedule'
+                  ? 'bg-[#0078d7] text-white shadow-lg shadow-[#0078d7]/20'
+                  : 'text-slate-400 hover:text-slate-200'
+                  }`}
+              >
+                <Clock size={14} />
+                <span>Quản lý lịch họp</span>
               </button>
             </div>
           </div>

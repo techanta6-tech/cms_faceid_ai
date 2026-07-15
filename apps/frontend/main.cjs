@@ -12,8 +12,6 @@ function createWindow() {
     },
   });
 
-  win.removeMenu();
-
   const isDev = process.env.NODE_ENV === 'development';
 
   if (isDev) {
