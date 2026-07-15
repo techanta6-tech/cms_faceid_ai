@@ -59,6 +59,19 @@ services:
     networks:
       - cms-faceid-network
 
+  # Frontend React Web
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    image: cms_faceid-frontend:latest
+    container_name: cms_faceid-frontend
+    ports:
+      - "3035:3035"
+    restart: always
+    networks:
+      - cms-faceid-network
+
 volumes:
   pgdata:
     driver: local

@@ -261,7 +261,7 @@ export const EmployeesPage = () => {
       <div className="flex-1 overflow-auto bg-[#111216] p-6 text-left">
         {activeEmployeeSubTab === 'employees-list' ? (
           /* Quản lý nhân sự */
-          <div className="space-y-6 max-w-6xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             {/* Header bar */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#14151c] border border-[#21232d] p-4 rounded-xl shadow-md">
               <div>
@@ -388,7 +388,8 @@ export const EmployeesPage = () => {
 
                           {/* Actions */}
                           <td className="p-4 text-center">
-                            <button
+                            {/* Nút X (xóa) đã ẩn theo yêu cầu */}
+                            {/* <button
                               onClick={() => {
                                 if (confirm(`Bạn có chắc chắn muốn xóa nhân sự "${emp.hoTen}" khỏi hệ thống không?`)) {
                                   setEmployees(employees.filter(e => e.id !== emp.id));
@@ -398,7 +399,7 @@ export const EmployeesPage = () => {
                               title="Xóa nhân sự"
                             >
                               <X size={15} />
-                            </button>
+                            </button> */}
                           </td>
                         </tr>
                       ))}
