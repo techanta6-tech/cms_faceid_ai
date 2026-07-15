@@ -64,6 +64,8 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
+      args:
+        - VITE_WS_URL=http://localhost:8082
     image: cms_faceid-frontend:latest
     container_name: cms_faceid-frontend
     ports:
