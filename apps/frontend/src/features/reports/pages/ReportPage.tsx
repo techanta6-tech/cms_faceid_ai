@@ -200,18 +200,24 @@ export const ReportPage = () => {
 
   const fetchPage = useCallback(async () => {
     setIsLoadingPage(true);
+    const { baseUrl, params } = buildEventLogsUrl();
+    const fullUrl = `${baseUrl}/meeting/event-logs?${params.toString()}`;
+    console.log(`[DEBUG Frontend] Bắt đầu truy vấn Danh sách sự kiện từ URL: ${fullUrl}`);
     try {
-      const { baseUrl, params } = buildEventLogsUrl();
-      const res = await fetch(`${baseUrl}/meeting/event-logs?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetch(fullUrl);
+      if (!res.ok) {
+        console.error(`[DEBUG Frontend] Truy vấn Danh sách sự kiện THẤT BẠI: HTTP Status = ${res.status}`);
+        throw new Error(`HTTP ${res.status}`);
+      }
       const json = await res.json();
+      console.log(`[DEBUG Frontend] Truy vấn Danh sách sự kiện THÀNH CÔNG! Kết quả trả về:`, json);
       if (json && Array.isArray(json.data)) {
         setPageLogs(json.data);
         setTotalServerItems(json.total ?? 0);
         if (json.data.length > 0) setSelectedEventId(json.data[0].stt);
       }
     } catch (e: any) {
-      console.warn('Failed to load event logs page:', e.message);
+      console.warn('[DEBUG Frontend] Lỗi ngoại lệ khi truy vấn Danh sách sự kiện:', e.message || e);
     } finally {
       setIsLoadingPage(false);
     }

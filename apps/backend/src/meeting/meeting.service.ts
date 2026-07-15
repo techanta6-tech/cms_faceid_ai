@@ -540,6 +540,7 @@ export class MeetingService {
     startDate?: string; endDate?: string; startTime?: string; endTime?: string;
     group?: string; eventType?: string;
   } = {}) {
+    console.log(`[DEBUG Backend] Bắt đầu truy vấn getEventLogs với các tham số:`, opts);
     const page   = Math.max(1, opts.page   || 1);
     const limit  = Math.min(500, Math.max(1, opts.limit || 10));
     const offset = (page - 1) * limit;
@@ -592,15 +593,22 @@ export class MeetingService {
       LIMIT ${limit} OFFSET ${offset};
     `;
 
-    const [countRows, rawEvents] = await Promise.all([
-      this.lcms.$queryRawUnsafe<any[]>(countQuery),
-      this.lcms.$queryRawUnsafe<any[]>(dataQuery),
-    ]);
+    try {
+      const [countRows, rawEvents] = await Promise.all([
+        this.lcms.$queryRawUnsafe<any[]>(countQuery),
+        this.lcms.$queryRawUnsafe<any[]>(dataQuery),
+      ]);
+      console.log(`[DEBUG Backend] Thực thi SQL thành công. Số lượng bản ghi thô (raw): ${rawEvents.length}`);
 
-    const total = parseInt(countRows[0]?.total ?? '0', 10);
-    const data  = rawEvents.map((e, idx) => this.mapRawEvent(e, idx, listMap, locationNameByCameraId, offset));
+      const total = parseInt(countRows[0]?.total ?? '0', 10);
+      const data  = rawEvents.map((e, idx) => this.mapRawEvent(e, idx, listMap, locationNameByCameraId, offset));
+      console.log(`[DEBUG Backend] Map dữ liệu thành công. Tổng số bản ghi (total): ${total}, Số bản ghi trả về trang này: ${data.length}`);
 
-    return { data, total, page, limit };
+      return { data, total, page, limit };
+    } catch (error: any) {
+      console.error(`[DEBUG Backend] LỖI khi thực thi truy vấn SQL getEventLogs:`, error.message || error);
+      throw error;
+    }
   }
 
   async getEventLogIds(opts: {
