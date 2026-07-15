@@ -35,10 +35,10 @@ services:
       - LCMS_DATABASE_URL=postgresql://postgres:@host.docker.internal:5433/lcms_server?connect_timeout=15&pooling=true&minpoolsize=0&maxpoolsize=200
       - DVMS_DATABASE_URL=postgresql://postgres:@host.docker.internal:5433/dvms_server?connect_timeout=15
       - PORT=3000
-      - IMAGE_LOCAL_PATH=C:\Program Files\DVMS System\DVMS Server\EventData\Images
+      - IMAGE_LOCAL_PATH=E:\EventData\Images
       - IMAGE_MOUNT_PATH=/app/event-images
     volumes:
-      - 'C:\Program Files\DVMS System\DVMS Server\EventData\Images:/app/event-images:ro'
+      - 'E:\EventData\Images:/app/event-images:ro'
     depends_on:
       - postgres-db
     restart: always
