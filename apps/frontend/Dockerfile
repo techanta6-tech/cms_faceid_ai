@@ -16,6 +16,10 @@ RUN yarn install --frozen-lockfile
 # Copy frontend source code
 COPY apps/frontend ./apps/frontend
 
+# Nhận biến build-arg để truyền vào Vite build env
+ARG VITE_WS_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+
 # Build frontend
 RUN yarn workspace frontend build
 
