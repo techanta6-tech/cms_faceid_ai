@@ -153,10 +153,15 @@ export const DevicesPage = () => {
   useEffect(() => {
     if (channelsLoadedRef.current || devices.length === 0) return;
     const loadChannels = async () => {
+      const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
+      const fullUrl = `${baseUrl}/channel`;
+      console.log(`[DEBUG Frontend DevicesPage] Bắt đầu tải danh sách kênh (loadChannels) từ URL: ${fullUrl}`);
       try {
-        const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
-        const res = await fetch(`${baseUrl}/channel`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const res = await fetch(fullUrl);
+        if (!res.ok) {
+          console.error(`[DEBUG Frontend DevicesPage] Tải danh sách kênh THẤT BẠI: HTTP Status = ${res.status}`);
+          throw new Error(`HTTP ${res.status}`);
+        }
         const rows = await res.json();
         if (Array.isArray(rows) && rows.length > 0) {
           const cameraNameById = new Map<string, string>(devices.map(d => [d.id, d.name]));

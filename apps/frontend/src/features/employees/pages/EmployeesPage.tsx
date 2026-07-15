@@ -35,14 +35,21 @@ export const EmployeesPage = () => {
 
   const fetchGroups = async () => {
     setIsRefreshingGroups(true);
+    const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
+    const fullUrl = `${baseUrl}/human-list`;
+    console.log(`[DEBUG Frontend EmployeesPage] Bắt đầu tải nhóm (fetchGroups) từ URL: ${fullUrl}`);
     try {
-      const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
-      const res = await fetch(`${baseUrl}/human-list`);
+      const res = await fetch(fullUrl);
+      if (!res.ok) {
+        console.error(`[DEBUG Frontend EmployeesPage] Tải nhóm THẤT BẠI: HTTP Status = ${res.status}`);
+        throw new Error(`HTTP ${res.status}`);
+      }
       const data = await res.json();
+      console.log(`[DEBUG Frontend EmployeesPage] Tải nhóm THÀNH CÔNG! Kết quả trả về:`, data);
       setHumanGroups(
         (data as any[]).map((item) => ({ id: item.id, name: item.name || item.id }))
       );
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Failed to load human-list from API:', e);
       setHumanGroups([]);
     } finally {
@@ -52,14 +59,25 @@ export const EmployeesPage = () => {
 
   const fetchEmployees = async () => {
     setIsRefreshingEmployees(true);
+    const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
+    console.log(`[DEBUG Frontend EmployeesPage] Bắt đầu tải danh sách nhân viên (fetchEmployees)...`);
     try {
-      const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
       const resList = await fetch(`${baseUrl}/human-list`);
+      if (!resList.ok) {
+        console.error(`[DEBUG Frontend EmployeesPage] Tải human-list THẤT BẠI: HTTP Status = ${resList.status}`);
+        throw new Error(`HTTP ${resList.status}`);
+      }
       const lists = await resList.json();
+      console.log(`[DEBUG Frontend EmployeesPage] Tải human-list THÀNH CÔNG! Số lượng:`, lists.length);
       const listMap: Record<string, string> = {};
       (lists as any[]).forEach((item) => { listMap[item.id] = item.name; });
       const resHumans = await fetch(`${baseUrl}/human`);
+      if (!resHumans.ok) {
+        console.error(`[DEBUG Frontend EmployeesPage] Tải human THẤT BẠI: HTTP Status = ${resHumans.status}`);
+        throw new Error(`HTTP ${resHumans.status}`);
+      }
       const humans = await resHumans.json();
+      console.log(`[DEBUG Frontend EmployeesPage] Tải human THÀNH CÔNG! Kết quả trả về:`, humans);
       const formatDate = (dateVal: any) => {
         if (!dateVal) return '';
         const d = new Date(dateVal);

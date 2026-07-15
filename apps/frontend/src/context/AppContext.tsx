@@ -142,12 +142,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const loadData = async () => {
+      console.log(`[DEBUG Frontend AppContext] Bắt đầu tải dữ liệu khởi tạo (loadData)...`);
       try {
         const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
 
         // 1. Fetch human-list (Nhóm nhân viên)
         const resList = await fetch(`${baseUrl}/human-list`);
+        if (!resList.ok) throw new Error(`Fetch human-list failed: HTTP ${resList.status}`);
         const lists = await resList.json();
+        console.log(`[DEBUG Frontend AppContext] Tải human-list THÀNH CÔNG! Số lượng nhóm:`, lists.length);
         const listMap: Record<string, string> = {};
         lists.forEach((item: any) => {
           listMap[item.id] = item.name;
@@ -155,7 +158,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
         // 2. Fetch human_info (nhân viên)
         const resHumans = await fetch(`${baseUrl}/human`);
+        if (!resHumans.ok) throw new Error(`Fetch human failed: HTTP ${resHumans.status}`);
         const humans = await resHumans.json();
+        console.log(`[DEBUG Frontend AppContext] Tải human THÀNH CÔNG! Số lượng nhân viên:`, humans.length);
 
         // 3. Map database schema to frontend employee schema
         const mappedEmployees = humans.map((h: any) => {
@@ -311,11 +316,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // fields that are missing or empty. Falls back to local mock devices on error.
   useEffect(() => {
     const loadDevices = async () => {
+      console.log(`[DEBUG Frontend AppContext] Bắt đầu tải danh sách thiết bị (loadDevices)...`);
       try {
         const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
         const res = await fetch(`${baseUrl}/camera`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const rows = await res.json();
+        console.log(`[DEBUG Frontend AppContext] Tải camera/thiết bị THÀNH CÔNG! Số lượng:`, rows.length);
         if (Array.isArray(rows) && rows.length > 0) {
           setDevices(rows.map(mapCameraCfgToDevice));
         }
@@ -333,6 +340,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // with camera details from the DVMS camera API. Reusable so CRUD actions can
   // re-sync the list with the DB after a mutation.
   const loadLocations = useCallback(async () => {
+    console.log(`[DEBUG Frontend AppContext] Bắt đầu tải danh sách khu vực (loadLocations)...`);
     try {
       const baseUrl = getBaseUrl();
 
@@ -340,11 +348,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const locRes = await fetch(`${baseUrl}/location`);
       if (!locRes.ok) throw new Error(`Location HTTP ${locRes.status}`);
       const locations: any[] = await locRes.json();
+      console.log(`[DEBUG Frontend AppContext] Tải locations THÀNH CÔNG! Số lượng:`, locations.length);
 
       // Fetch cameras from DVMS to enrich location_camera_bind with details
       const camRes = await fetch(`${baseUrl}/camera`);
       if (!camRes.ok) throw new Error(`Camera HTTP ${camRes.status}`);
       const cameras: any[] = await camRes.json();
+      console.log(`[DEBUG Frontend AppContext] Tải cameras cho locations THÀNH CÔNG! Số lượng:`, cameras.length);
       const cameraById = new Map(cameras.map(c => [c.id, c]));
 
       // Map locations to Area format, enriching bindings with camera data
@@ -465,11 +475,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const loadHumanGroups = async () => {
+      console.log(`[DEBUG Frontend AppContext] Bắt đầu tải danh sách nhóm nhân viên (loadHumanGroups)...`);
       try {
         const baseUrl = getBaseUrl();
         const res = await fetch(`${baseUrl}/human-list`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const rows = await res.json();
+        console.log(`[DEBUG Frontend AppContext] Tải human-list cho cuộc họp THÀNH CÔNG! Số lượng:`, rows.length);
         if (Array.isArray(rows)) {
           setHumanGroups(rows.map((r: any) => ({ id: r.id, name: r.name })));
         }
@@ -484,11 +496,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
 
   const loadMeetings = useCallback(async () => {
+    console.log(`[DEBUG Frontend AppContext] Bắt đầu tải danh sách cuộc họp (loadMeetings)...`);
     try {
       const baseUrl = getBaseUrl();
       const res = await fetch(`${baseUrl}/meeting`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const rows = await res.json();
+      console.log(`[DEBUG Frontend AppContext] Tải meetings THÀNH CÔNG! Số lượng:`, rows.length);
       if (Array.isArray(rows)) {
         setMeetings(rows.map(mapMeetingRow));
       }
