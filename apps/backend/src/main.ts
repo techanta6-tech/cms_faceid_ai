@@ -1,8 +1,11 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import * as fs from 'fs';
 
-// Nạp các biến môi trường từ file .env
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+// Nạp các biến môi trường từ file .env.development nếu tồn tại, ngược lại dùng .env
+const devEnvPath = path.join(__dirname, '..', '.env.development');
+const envPath = fs.existsSync(devEnvPath) ? devEnvPath : path.join(__dirname, '..', '.env');
+dotenv.config({ path: envPath });
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';

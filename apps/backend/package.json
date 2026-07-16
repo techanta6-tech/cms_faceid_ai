@@ -8,11 +8,11 @@
     "start:dev": "yarn prisma:generate && node ../../node_modules/@nestjs/cli/bin/nest.js start --watch",
     "start:dev:nogen": "node ../../node_modules/@nestjs/cli/bin/nest.js start --watch",
     "start:prod": "node dist/main",
-    "prisma:generate": "node ../../node_modules/prisma/build/index.js generate --schema=prisma/lcms.prisma && node ../../node_modules/prisma/build/index.js generate --schema=prisma/dvms.prisma && node ../../node_modules/prisma/build/index.js generate --schema=prisma/cms_webserver.prisma",
-    "prisma:push": "node ../../node_modules/prisma/build/index.js db push --schema=prisma/lcms.prisma --accept-data-loss --skip-generate && node ../../node_modules/prisma/build/index.js db push --schema=prisma/dvms.prisma --accept-data-loss --skip-generate && node ../../node_modules/prisma/build/index.js db push --schema=prisma/cms_webserver.prisma --accept-data-loss --skip-generate",
-    "prisma:studio:lcms": "node ../../node_modules/prisma/build/index.js studio --schema=prisma/lcms.prisma",
-    "prisma:studio:dvms": "node ../../node_modules/prisma/build/index.js studio --schema=prisma/dvms.prisma",
-    "prisma:studio:cms": "node ../../node_modules/prisma/build/index.js studio --schema=prisma/cms_webserver.prisma"
+    "prisma:generate": "node run-prisma.js generate --schema=prisma/lcms.prisma && node run-prisma.js generate --schema=prisma/dvms.prisma && node run-prisma.js generate --schema=prisma/cms_webserver.prisma",
+    "prisma:push": "node run-prisma.js db push --schema=prisma/lcms.prisma --accept-data-loss --skip-generate && node run-prisma.js db push --schema=prisma/dvms.prisma --accept-data-loss --skip-generate && node run-prisma.js db push --schema=prisma/cms_webserver.prisma --accept-data-loss --skip-generate",
+    "prisma:studio:lcms": "node run-prisma.js studio --schema=prisma/lcms.prisma",
+    "prisma:studio:dvms": "node run-prisma.js studio --schema=prisma/dvms.prisma",
+    "prisma:studio:cms": "node run-prisma.js studio --schema=prisma/cms_webserver.prisma"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
