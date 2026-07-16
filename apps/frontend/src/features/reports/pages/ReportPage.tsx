@@ -2202,7 +2202,7 @@ export const ReportPage = () => {
 
                           setIsLoadingReport(true);
                           try {
-                            const baseUrl = (import.meta as any).env.VITE_WS_URL || 'http://localhost:3001';
+                            const baseUrl = getBackendUrl();
                             const res = await fetch(`${baseUrl}/meeting/${meet.id}/attendance-report`);
                             if (res.ok) {
                               const data = await res.json();
