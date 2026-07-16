@@ -165,6 +165,8 @@ export const ReportPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isPerPageOpen, setIsPerPageOpen] = useState(false);
+  const [isEventExportOpen, setIsEventExportOpen] = useState(false);
+  const [isMeetingExportOpen, setIsMeetingExportOpen] = useState(false);
   const PER_PAGE_OPTIONS = [10, 20, 40, 50, 100];
   const [showAttendanceReportDemo, setShowAttendanceReportDemo] = useState(false);
 
@@ -1186,36 +1188,51 @@ export const ReportPage = () => {
                   Tổng Số Lượng: <span className="font-bold text-slate-100 font-mono">{totalItems}</span>
                 </div>
 
-                <div className="relative group">
-                  {/* Dropup menu - visible on hover */}
-                  <div className="absolute bottom-full right-0 pb-1 hidden group-hover:flex flex-col items-stretch z-20 min-w-[170px]">
-                    <div className="bg-[#1a1b25] border border-[#2d2f3e] rounded-lg shadow-xl overflow-hidden flex flex-col items-stretch">
-                      <button
-                        id="btn-export-all"
-                        onClick={() => handleExportExcelData([], true)}
-                        disabled={exporting}
-                        className="px-4 py-2 text-xs text-slate-200 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8] flex items-center space-x-2 transition text-left whitespace-nowrap disabled:opacity-50"
-                      >
-                        <Download size={12} />
-                        <span>Xuất toàn bộ ({totalItems})</span>
-                      </button>
-                      <div className="border-t border-[#2d2f3e]" />
-                      <button
-                        id="btn-export-page"
-                        onClick={() => handleExportExcelData(currentLogs, false)}
-                        disabled={exporting}
-                        className="px-4 py-2 text-xs text-slate-200 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8] flex items-center space-x-2 transition text-left whitespace-nowrap disabled:opacity-50"
-                      >
-                        <Download size={12} />
-                        <span>Xuất trong trang ({currentLogs.length})</span>
-                      </button>
-                    </div>
-                  </div>
+                <div className="relative">
+                  {/* Dropup menu - visible on click toggle */}
+                  {isEventExportOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-30"
+                        onClick={() => setIsEventExportOpen(false)}
+                      />
+                      <div className="absolute bottom-full right-0 pb-1 z-40 min-w-[170px]">
+                        <div className="bg-[#1a1b25] border border-[#2d2f3e] rounded-lg shadow-xl overflow-hidden flex flex-col items-stretch">
+                          <button
+                            id="btn-export-all"
+                            onClick={() => {
+                              handleExportExcelData([], true);
+                              setIsEventExportOpen(false);
+                            }}
+                            disabled={exporting}
+                            className="px-4 py-2 text-xs text-slate-200 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8] flex items-center space-x-2 transition text-left whitespace-nowrap disabled:opacity-50 cursor-pointer"
+                          >
+                            <Download size={12} />
+                            <span>Xuất toàn bộ ({totalItems})</span>
+                          </button>
+                          <div className="border-t border-[#2d2f3e]" />
+                          <button
+                            id="btn-export-page"
+                            onClick={() => {
+                              handleExportExcelData(currentLogs, false);
+                              setIsEventExportOpen(false);
+                            }}
+                            disabled={exporting}
+                            className="px-4 py-2 text-xs text-slate-200 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8] flex items-center space-x-2 transition text-left whitespace-nowrap disabled:opacity-50 cursor-pointer"
+                          >
+                            <Download size={12} />
+                            <span>Xuất trong trang ({currentLogs.length})</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   {/* Main export trigger button */}
                   <button
                     id="btn-export-excel"
                     disabled={exporting}
+                    onClick={() => setIsEventExportOpen(prev => !prev)}
                     className={`px-4 py-1.5 bg-[#0078d7] hover:bg-[#0069be] text-white font-medium rounded text-xs transition shadow flex items-center space-x-1.5 ${exporting ? 'opacity-70 cursor-wait' : ''}`}
                   >
                     <Download size={13} />
@@ -2161,33 +2178,44 @@ export const ReportPage = () => {
                             className="bg-[#181921] border border-[#2d2f3c] focus:border-[#00a2e8] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white w-44 focus:outline-none transition-all"
                           />
                         </div>
-                        <div className="relative group">
-                          {/* Dropup menu - visible on hover */}
-                          <div className="absolute bottom-full right-0 pb-1 hidden group-hover:flex flex-col items-stretch z-20 min-w-[170px]">
-                            <div className="bg-[#1a1b25] border border-[#2d2f3e] rounded-lg shadow-xl overflow-hidden flex flex-col items-stretch">
-                              <button
-                                onClick={() => {
-                                  handleExportMeetingReportExcel(selectedMeetingReport, computedAttendeeRoster);
-                                }}
-                                className="px-4 py-2 text-xs text-slate-200 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8] flex items-center space-x-2 transition text-left whitespace-nowrap cursor-pointer"
-                              >
-                                <Download size={12} />
-                                <span>Xuất toàn bộ ({computedAttendeeRoster.length})</span>
-                              </button>
-                              <div className="border-t border-[#2d2f3e]" />
-                              <button
-                                onClick={() => {
-                                  handleExportMeetingReportExcel(selectedMeetingReport, currentMeetingRoster);
-                                }}
-                                className="px-4 py-2 text-xs text-slate-200 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8] flex items-center space-x-2 transition text-left whitespace-nowrap cursor-pointer"
-                              >
-                                <Download size={12} />
-                                <span>Xuất trong trang ({currentMeetingRoster.length})</span>
-                              </button>
-                            </div>
-                          </div>
+                        <div className="relative">
+                          {/* Dropup menu - visible on click toggle */}
+                          {isMeetingExportOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setIsMeetingExportOpen(false)}
+                              />
+                              <div className="absolute bottom-full right-0 pb-1 z-40 min-w-[170px]">
+                                <div className="bg-[#1a1b25] border border-[#2d2f3e] rounded-lg shadow-xl overflow-hidden flex flex-col items-stretch">
+                                  <button
+                                    onClick={() => {
+                                      handleExportMeetingReportExcel(selectedMeetingReport, computedAttendeeRoster);
+                                      setIsMeetingExportOpen(false);
+                                    }}
+                                    className="px-4 py-2 text-xs text-slate-200 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8] flex items-center space-x-2 transition text-left whitespace-nowrap cursor-pointer"
+                                  >
+                                    <Download size={12} />
+                                    <span>Xuất toàn bộ ({computedAttendeeRoster.length})</span>
+                                  </button>
+                                  <div className="border-t border-[#2d2f3e]" />
+                                  <button
+                                    onClick={() => {
+                                      handleExportMeetingReportExcel(selectedMeetingReport, currentMeetingRoster);
+                                      setIsMeetingExportOpen(false);
+                                    }}
+                                    className="px-4 py-2 text-xs text-slate-200 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8] flex items-center space-x-2 transition text-left whitespace-nowrap cursor-pointer"
+                                  >
+                                    <Download size={12} />
+                                    <span>Xuất trong trang ({currentMeetingRoster.length})</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
 
                           <button
+                            onClick={() => setIsMeetingExportOpen(prev => !prev)}
                             className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white rounded-lg text-xs font-semibold transition shadow-md shadow-[#00a2e8]/10"
                           >
                             <Download size={13} />
