@@ -602,7 +602,7 @@ export const ReportPage = () => {
   const [hasInitializedAreas, setHasInitializedAreas] = useState(false);
   useEffect(() => {
     if (areasData && areasData.length > 0 && !hasInitializedAreas) {
-      const areaNames = areasData.map(a => a.name);
+      const areaNames = areasData.map(a => a.name).filter(name => name !== 'Checkin Area' && name !== 'Checkout Area');
       setSelectedMeetingAreas(areaNames);
       setAppliedMeetingAreas(areaNames);
       setHasInitializedAreas(true);
@@ -2047,11 +2047,14 @@ export const ReportPage = () => {
                             className="w-full bg-[#1c1d26] border border-[#2d2f3c] hover:border-[#00a2e8] rounded-lg px-3 py-2 text-xs text-white text-left flex items-center justify-between transition-all focus:outline-none h-[38px]"
                           >
                             <span className="truncate pr-1">
-                              {selectedMeetingAreas.length === 0
-                                ? 'Chưa chọn khu vực'
-                                : selectedMeetingAreas.length === areasData.length
-                                  ? `Tất cả (${areasData.length} phòng)`
-                                  : selectedMeetingAreas.join(', ')}
+                              {(() => {
+                                const meetingAreas = areasData.filter(a => a.name !== 'Checkin Area' && a.name !== 'Checkout Area');
+                                return selectedMeetingAreas.length === 0
+                                  ? 'Chưa chọn khu vực'
+                                  : selectedMeetingAreas.length === meetingAreas.length
+                                    ? `Tất cả (${meetingAreas.length} phòng)`
+                                    : selectedMeetingAreas.join(', ');
+                              })()}
                             </span>
                             <ChevronDown size={14} className={`text-[#00a2e8] transition-transform duration-200 ${isMeetingAreaDropdownOpen ? 'rotate-180' : ''}`} />
                           </button>
@@ -2066,7 +2069,10 @@ export const ReportPage = () => {
                                 <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
                                   <button
                                     type="button"
-                                    onClick={() => setSelectedMeetingAreas(areasData.map(a => a.name))}
+                                    onClick={() => {
+                                      const meetingAreas = areasData.filter(a => a.name !== 'Checkin Area' && a.name !== 'Checkout Area');
+                                      setSelectedMeetingAreas(meetingAreas.map(a => a.name));
+                                    }}
                                     className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
                                   >
                                     Chọn tất cả
@@ -2080,7 +2086,7 @@ export const ReportPage = () => {
                                   </button>
                                 </div>
                                 <div className="max-h-48 overflow-y-auto space-y-1">
-                                  {areasData.map((area) => {
+                                  {areasData.filter(a => a.name !== 'Checkin Area' && a.name !== 'Checkout Area').map((area) => {
                                     const areaOption = area.name;
                                     const isChecked = selectedMeetingAreas.includes(areaOption);
                                     return (
