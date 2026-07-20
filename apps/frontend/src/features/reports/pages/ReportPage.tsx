@@ -4288,9 +4288,9 @@ export const ReportPage = () => {
                       <button
                         type="button"
                         onClick={() => setMeetingSubTab('meetings')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition duration-150 cursor-pointer ${
+                        className={`px-4 py-1.5 rounded-lg text-xs font-medium transition shadow duration-150 cursor-pointer ${
                           meetingSubTab === 'meetings'
-                            ? 'bg-[#00a2e8] text-white'
+                            ? 'bg-[#00a2e8] hover:bg-[#008cc9] text-white'
                             : 'bg-[#1c1d26] text-slate-400 hover:text-white border border-[#2d2f3c]'
                         }`}
                       >
@@ -4300,9 +4300,9 @@ export const ReportPage = () => {
                       <button
                         type="button"
                         onClick={() => setMeetingSubTab('employees')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition duration-150 cursor-pointer ${
+                        className={`px-4 py-1.5 rounded-lg text-xs font-medium transition shadow duration-150 cursor-pointer ${
                           meetingSubTab === 'employees'
-                            ? 'bg-[#00a2e8] text-white'
+                            ? 'bg-[#00a2e8] hover:bg-[#008cc9] text-white'
                             : 'bg-[#1c1d26] text-slate-400 hover:text-white border border-[#2d2f3c]'
                         }`}
                       >
@@ -4318,7 +4318,7 @@ export const ReportPage = () => {
                               setIsMeetingMultiSelectMode(false);
                               setSelectedMeetingReportIds([]);
                             }}
-                            className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 rounded text-[11px] font-bold uppercase transition duration-150 cursor-pointer focus:outline-none"
+                            className="px-4 py-1.5 bg-[#1c1d26] hover:bg-[#252733] text-slate-300 hover:text-white border border-[#2d2f3c] rounded-lg text-xs font-medium transition shadow cursor-pointer focus:outline-none"
                           >
                             Hủy
                           </button>
@@ -4326,9 +4326,9 @@ export const ReportPage = () => {
                             type="button"
                             onClick={() => handleExportMultipleMeetingsExcel(selectedMeetingReportIds)}
                             disabled={selectedMeetingReportIds.length === 0}
-                            className="px-3 py-1 bg-[#00a2e8] hover:bg-[#008cc9] text-white rounded text-[11px] font-bold uppercase transition duration-150 cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 focus:outline-none"
+                            className="px-4 py-1.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white font-medium rounded-lg text-xs transition shadow cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 focus:outline-none"
                           >
-                            <Download size={11} />
+                            <Download size={13} />
                             <span>Xuất báo cáo cho ({selectedMeetingReportIds.length}) cuộc họp</span>
                           </button>
                         </div>
@@ -4344,7 +4344,7 @@ export const ReportPage = () => {
                               setIsEmpMultiSelectMode(false);
                               setSelectedEmpReportIds([]);
                             }}
-                            className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 rounded text-[11px] font-bold uppercase transition duration-150 cursor-pointer focus:outline-none"
+                            className="px-4 py-1.5 bg-[#1c1d26] hover:bg-[#252733] text-slate-300 hover:text-white border border-[#2d2f3c] rounded-lg text-xs font-medium transition shadow cursor-pointer focus:outline-none"
                           >
                             Hủy
                           </button>
@@ -4352,9 +4352,9 @@ export const ReportPage = () => {
                             type="button"
                             onClick={() => handleExportMultipleEmployeesExcel(selectedEmpReportIds)}
                             disabled={selectedEmpReportIds.length === 0}
-                            className="px-3 py-1 bg-[#00a2e8] hover:bg-[#008cc9] text-white rounded text-[11px] font-bold uppercase transition duration-150 cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 focus:outline-none"
+                            className="px-4 py-1.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white font-medium rounded-lg text-xs transition shadow cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 focus:outline-none"
                           >
-                            <Download size={11} />
+                            <Download size={13} />
                             <span>Xuất Excel ({selectedEmpReportIds.length}) nhân viên</span>
                           </button>
                         </div>
@@ -4521,9 +4521,9 @@ export const ReportPage = () => {
                             type="button"
                             onClick={() => handleExportEmployeeDetailExcel(selectedEmpStats)}
                             disabled={!selectedEmpStats.details || selectedEmpStats.details.length === 0}
-                            className="px-3 py-1.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white rounded-lg text-[11px] font-bold uppercase transition duration-150 cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 shrink-0 focus:outline-none"
+                            className="px-4 py-1.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white font-medium rounded-lg text-xs transition shadow cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 shrink-0 focus:outline-none"
                           >
-                            <Download size={12} />
+                            <Download size={13} />
                             <span>Xuất Excel</span>
                           </button>
                         </div>

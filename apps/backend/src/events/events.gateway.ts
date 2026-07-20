@@ -63,4 +63,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log(`Received ping from client ${client.id}:`, data);
     return { event: 'pong_client', data: { message: 'Hello from NestJS WebSocket Server!', time: new Date() } };
   }
+
+  broadcastRealtimeLog(log: any) {
+    if (this.server) {
+      this.server.emit('realtime_log', log);
+      console.log('[EventsGateway] Broadcasted realtime_log to clients:', log.id);
+    }
+  }
 }

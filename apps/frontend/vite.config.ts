@@ -20,6 +20,25 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {
         ignored: ['**/dist-electron/**', '**/dist/**']
       },
+      proxy: {
+        '^/HLS-PROXY/.*': {
+          target: 'http://localhost:10090',
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+          router: (req) => {
+            const match = req.url.match(/^\/HLS-PROXY\/([^\/]+)/);
+            if (match) {
+              const target = match[1];
+              return `http://${target}`;
+            }
+            return 'http://localhost:10090';
+          },
+          rewrite: (path) => {
+            return path.replace(/^\/HLS-PROXY\/[^\/]+/, '');
+          },
+        }
+      }
     },
   };
 });

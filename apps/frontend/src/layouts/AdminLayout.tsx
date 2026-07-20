@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { Monitor, FileText, Layers, Users, CalendarClock } from 'lucide-react';
+import { Monitor, FileText, Layers, Users, CalendarClock, LayoutDashboard } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 
 export const AdminLayout: React.FC = () => {
@@ -32,6 +32,25 @@ export const AdminLayout: React.FC = () => {
           {/* Sidebar Items */}
           <div className="p-3 flex-1 space-y-1.5">
             <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest px-3 mb-2">Chức năng</p>
+
+            {/* Sidebar Item 0: Bảng điều khiển */}
+            <NavLink
+              to="/dashboard"
+              className={({ isActive }) =>
+                `w-full flex items-center space-x-3 px-3 py-2.5 rounded-r-lg rounded-l-none text-xs font-medium transition-all duration-200 group ${isActive
+                  ? 'bg-[#00a2e8]/10 text-[#00a2e8] border-l-4 border-[#00a2e8]'
+                  : 'text-slate-400 hover:bg-[#1a1c24] hover:text-slate-200'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <LayoutDashboard size={16} className={isActive ? 'text-[#00a2e8]' : 'text-slate-400 group-hover:text-slate-200'} />
+                  <span>Bảng điều khiển</span>
+                  {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#00a2e8]" />}
+                </>
+              )}
+            </NavLink>
 
             {/* Sidebar Item 1: Báo cáo */}
             <NavLink
