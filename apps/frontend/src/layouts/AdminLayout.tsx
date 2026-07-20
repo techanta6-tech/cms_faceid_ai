@@ -33,8 +33,8 @@ export const AdminLayout: React.FC = () => {
           <div className="p-3 flex-1 space-y-1.5">
             <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest px-3 mb-2">Chức năng</p>
 
-            {/* Sidebar Item 0: Bảng điều khiển */}
-            <NavLink
+            {/* Sidebar Item 0: Bảng điều khiển (Hidden) */}
+            {/* <NavLink
               to="/dashboard"
               className={({ isActive }) =>
                 `w-full flex items-center space-x-3 px-3 py-2.5 rounded-r-lg rounded-l-none text-xs font-medium transition-all duration-200 group ${isActive
@@ -50,7 +50,7 @@ export const AdminLayout: React.FC = () => {
                   {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#00a2e8]" />}
                 </>
               )}
-            </NavLink>
+            </NavLink> */}
 
             {/* Sidebar Item 1: Báo cáo */}
             <NavLink
