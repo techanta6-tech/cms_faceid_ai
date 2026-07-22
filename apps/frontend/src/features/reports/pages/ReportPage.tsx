@@ -395,7 +395,7 @@ export const ReportPage = () => {
       };
       fetchAll();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetingSubTab, filteredMeetingIdsKey]);
 
   const employeeMeetingStats = useMemo(() => {
@@ -489,7 +489,7 @@ export const ReportPage = () => {
     }).filter(item => {
       if (meetingSearchQuery) {
         return item.emp.hoTen.toLowerCase().includes(meetingSearchQuery.toLowerCase()) ||
-               item.emp.maGiayTo.includes(meetingSearchQuery);
+          item.emp.maGiayTo.includes(meetingSearchQuery);
       }
       return item.requiredCount > 0;
     });
@@ -1273,7 +1273,7 @@ export const ReportPage = () => {
         const res = await fetch(`${baseUrl}/meeting/${id}/attendance-report`);
         if (!res.ok) throw new Error(`Không thể lấy dữ liệu cuộc họp ID: ${id}`);
         const data = await res.json();
-        
+
         // Find the meeting info in schMeetingSavedData or mock it if missing
         const rawMeet = schMeetingSavedData.find((m: any) => m.id === id);
         const meetInfo = {
@@ -2689,11 +2689,11 @@ export const ReportPage = () => {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') fetchPage();
                   }}
-                  className="w-full bg-[#181921] border border-[#2a2c3a] rounded-lg pl-8 pr-3 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00a2e8]"
+                  className="w-full bg-[#181921] border border-[#2a2c3a] rounded-xl pl-8 pr-10 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00a2e8] h-[42px]"
                 />
-                <Search className="absolute left-2.5 top-2 text-slate-500" size={13} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={13} />
                 {appliedSearch && (
-                  <button onClick={() => { setAppliedSearch(''); setCurrentPage(1); }} className="absolute right-2.5 top-1.5 text-slate-400 hover:text-slate-200">
+                  <button onClick={() => { setAppliedSearch(''); setCurrentPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
                     <X size={14} />
                   </button>
                 )}
@@ -3188,12 +3188,6 @@ export const ReportPage = () => {
 
                 {/* REPORT BUILDER CONTROLS PANEL */}
                 <div className="bg-[#14151b] border border-[#21232d] rounded-2xl p-6 shadow-2xl relative">
-                  <div className="flex items-center justify-between mb-5 border-b border-[#21232d] pb-4">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-100 tracking-tight">Report Builder</h3>
-                    </div>
-                  </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
                     {/* Type Select */}
                     <div className="md:col-span-2 space-y-2 text-left relative">
@@ -4145,13 +4139,13 @@ export const ReportPage = () => {
                             type="time"
                             value={meetingStartTime}
                             onChange={(e) => setMeetingStartTime(e.target.value)}
-                            className="w-full bg-[#1c1d26] border border-[#2d2f3c] focus:border-[#00a2e8] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none transition-all"
+                            className="w-full bg-[#1c1d26] border border-[#2d2f3c] hover:border-[#00a2e8] focus:border-[#00a2e8] rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all h-[42px] [color-scheme:dark]"
                           />
                           <input
                             type="date"
                             value={meetingStartDate}
                             onChange={(e) => setMeetingStartDate(e.target.value)}
-                            className="w-full bg-[#1c1d26] border border-[#2d2f3c] focus:border-[#00a2e8] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none transition-all"
+                            className="w-full bg-[#1c1d26] border border-[#2d2f3c] hover:border-[#00a2e8] focus:border-[#00a2e8] rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all h-[42px] [color-scheme:dark]"
                           />
                         </div>
                       </div>
@@ -4163,13 +4157,13 @@ export const ReportPage = () => {
                             type="time"
                             value={meetingEndTime}
                             onChange={(e) => setMeetingEndTime(e.target.value)}
-                            className="w-full bg-[#1c1d26] border border-[#2d2f3c] focus:border-[#00a2e8] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none transition-all"
+                            className="w-full bg-[#1c1d26] border border-[#2d2f3c] hover:border-[#00a2e8] focus:border-[#00a2e8] rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all h-[42px] [color-scheme:dark]"
                           />
                           <input
                             type="date"
                             value={meetingEndDate}
                             onChange={(e) => setMeetingEndDate(e.target.value)}
-                            className="w-full bg-[#1c1d26] border border-[#2d2f3c] focus:border-[#00a2e8] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none transition-all"
+                            className="w-full bg-[#1c1d26] border border-[#2d2f3c] hover:border-[#00a2e8] focus:border-[#00a2e8] rounded-xl px-4 py-2 text-xs text-white focus:outline-none transition-all h-[42px] [color-scheme:dark]"
                           />
                         </div>
                       </div>
@@ -4288,11 +4282,10 @@ export const ReportPage = () => {
                       <button
                         type="button"
                         onClick={() => setMeetingSubTab('meetings')}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-medium transition shadow duration-150 cursor-pointer ${
-                          meetingSubTab === 'meetings'
-                            ? 'bg-[#00a2e8] hover:bg-[#008cc9] text-white'
-                            : 'bg-[#1c1d26] text-slate-400 hover:text-white border border-[#2d2f3c]'
-                        }`}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-medium transition shadow duration-150 cursor-pointer ${meetingSubTab === 'meetings'
+                          ? 'bg-[#00a2e8] hover:bg-[#008cc9] text-white'
+                          : 'bg-[#1c1d26] text-slate-400 hover:text-white border border-[#2d2f3c]'
+                          }`}
                       >
                         Danh sách cuộc họp ({filteredMeetingsMemo.length})
                       </button>
@@ -4300,11 +4293,10 @@ export const ReportPage = () => {
                       <button
                         type="button"
                         onClick={() => setMeetingSubTab('employees')}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-medium transition shadow duration-150 cursor-pointer ${
-                          meetingSubTab === 'employees'
-                            ? 'bg-[#00a2e8] hover:bg-[#008cc9] text-white'
-                            : 'bg-[#1c1d26] text-slate-400 hover:text-white border border-[#2d2f3c]'
-                        }`}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-medium transition shadow duration-150 cursor-pointer ${meetingSubTab === 'employees'
+                          ? 'bg-[#00a2e8] hover:bg-[#008cc9] text-white'
+                          : 'bg-[#1c1d26] text-slate-400 hover:text-white border border-[#2d2f3c]'
+                          }`}
                       >
                         Báo cáo theo nhân viên
                       </button>
@@ -4430,11 +4422,10 @@ export const ReportPage = () => {
                                     handleSelectMeeting(meet);
                                   }
                                 }}
-                                className={`bg-[#14151b] border rounded-2xl p-4 cursor-pointer transition-all duration-150 hover:scale-[1.01] hover:bg-[#1a1b24] shadow-md group relative overflow-hidden text-left ${
-                                  isSelected
-                                    ? 'border-[#00a2e8] shadow-lg shadow-[#00a2e8]/10'
-                                    : 'border-[#21232d] hover:border-[#00a2e8]/50'
-                                }`}
+                                className={`bg-[#14151b] border rounded-2xl p-4 cursor-pointer transition-all duration-150 hover:scale-[1.01] hover:bg-[#1a1b24] shadow-md group relative overflow-hidden text-left ${isSelected
+                                  ? 'border-[#00a2e8] shadow-lg shadow-[#00a2e8]/10'
+                                  : 'border-[#21232d] hover:border-[#00a2e8]/50'
+                                  }`}
                               >
                                 <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#00a2e8]" />
 
@@ -4445,11 +4436,10 @@ export const ReportPage = () => {
                                     </h5>
                                     <div className="flex items-center space-x-1.5 shrink-0">
                                       {isMeetingMultiSelectMode && (
-                                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${
-                                          isSelected
-                                            ? 'border-[#00a2e8] bg-[#00a2e8]'
-                                            : 'border-[#2d2f3c] bg-[#111218]'
-                                        }`}>
+                                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isSelected
+                                          ? 'border-[#00a2e8] bg-[#00a2e8]'
+                                          : 'border-[#2d2f3c] bg-[#111218]'
+                                          }`}>
                                           {isSelected && <Check size={8} className="text-white font-bold" />}
                                         </div>
                                       )}
@@ -4548,7 +4538,7 @@ export const ReportPage = () => {
                                   {selectedEmpStats.details.map((det: any, idx: number) => {
                                     const activeDetail = selectedEmpMeetingDetail || selectedEmpStats.details[0];
                                     const isRowSelected = activeDetail?.meetingId === det.meetingId;
-                                    
+
                                     // Calculate evaluation text and classes
                                     let statusText = 'Vắng';
                                     let statusColor = 'text-rose-500 bg-rose-500/10 border-rose-500/20';
@@ -4578,11 +4568,10 @@ export const ReportPage = () => {
                                       <tr
                                         key={det.meetingId}
                                         onClick={() => setSelectedEmpMeetingDetail(det)}
-                                        className={`cursor-pointer transition-all ${
-                                          isRowSelected
-                                            ? 'bg-[#00a2e8]/10 text-[#00a2e8] hover:bg-[#00a2e8]/15 font-medium'
-                                            : 'hover:bg-[#181921]/60 text-slate-300'
-                                        }`}
+                                        className={`cursor-pointer transition-all ${isRowSelected
+                                          ? 'bg-[#00a2e8]/10 text-[#00a2e8] hover:bg-[#00a2e8]/15 font-medium'
+                                          : 'hover:bg-[#181921]/60 text-slate-300'
+                                          }`}
                                       >
                                         <td className="py-3 px-3 text-center text-slate-500 font-semibold">{idx + 1}</td>
                                         <td className="py-3 px-3 font-sans max-w-[150px] truncate" title={det.title}>{det.title}</td>
@@ -4629,11 +4618,10 @@ export const ReportPage = () => {
                                   <div className="space-y-1.5">
                                     <div className="flex items-center justify-between">
                                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ảnh lúc vào</span>
-                                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                                        !activeDetail.thoiGianVao
-                                          ? 'text-slate-500 bg-slate-500/10 border-slate-500/10'
-                                          : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                                      }`}>
+                                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${!activeDetail.thoiGianVao
+                                        ? 'text-slate-500 bg-slate-500/10 border-slate-500/10'
+                                        : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                                        }`}>
                                         {activeDetail.thoiGianVao || 'Trống'}
                                       </span>
                                     </div>
@@ -4665,11 +4653,10 @@ export const ReportPage = () => {
                                   <div className="space-y-1.5">
                                     <div className="flex items-center justify-between">
                                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ảnh lúc ra</span>
-                                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                                        !activeDetail.thoiGianRa
-                                          ? 'text-slate-500 bg-slate-500/10 border-slate-500/10'
-                                          : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                                      }`}>
+                                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${!activeDetail.thoiGianRa
+                                        ? 'text-slate-500 bg-slate-500/10 border-slate-500/10'
+                                        : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                                        }`}>
                                         {activeDetail.thoiGianRa || 'Trống'}
                                       </span>
                                     </div>
@@ -4734,79 +4721,77 @@ export const ReportPage = () => {
                                 {employeeMeetingStats.map((item, idx) => {
                                   const isSelected = selectedEmpReportIds.includes(item.emp.id);
                                   return (
-                                  <tr
-                                    key={item.emp.id}
-                                    onMouseDown={() => {
-                                      if (!isEmpMultiSelectMode) {
-                                        longPressTimerRef.current = setTimeout(() => {
-                                          setIsEmpMultiSelectMode(true);
-                                          setSelectedEmpReportIds([item.emp.id]);
-                                        }, 600);
-                                      }
-                                    }}
-                                    onMouseUp={() => {
-                                      if (longPressTimerRef.current) {
-                                        clearTimeout(longPressTimerRef.current);
-                                        longPressTimerRef.current = null;
-                                      }
-                                    }}
-                                    onMouseLeave={() => {
-                                      if (longPressTimerRef.current) {
-                                        clearTimeout(longPressTimerRef.current);
-                                        longPressTimerRef.current = null;
-                                      }
-                                    }}
-                                    onTouchStart={() => {
-                                      if (!isEmpMultiSelectMode) {
-                                        longPressTimerRef.current = setTimeout(() => {
-                                          setIsEmpMultiSelectMode(true);
-                                          setSelectedEmpReportIds([item.emp.id]);
-                                        }, 600);
-                                      }
-                                    }}
-                                    onTouchEnd={() => {
-                                      if (longPressTimerRef.current) {
-                                        clearTimeout(longPressTimerRef.current);
-                                        longPressTimerRef.current = null;
-                                      }
-                                    }}
-                                    onClick={() => {
-                                      if (isEmpMultiSelectMode) {
-                                        setSelectedEmpReportIds(prev => {
-                                          if (prev.includes(item.emp.id)) {
-                                            return prev.filter(id => id !== item.emp.id);
-                                          } else {
-                                            return [...prev, item.emp.id];
-                                          }
-                                        });
-                                      } else {
-                                        setSelectedEmpStats(item);
-                                        setSelectedEmpMeetingDetail(item.details[0] || null);
-                                      }
-                                    }}
-                                    className={`cursor-pointer transition-colors hover:bg-[#181921]/60 text-slate-300 ${
-                                      isSelected ? 'bg-[#00a2e8]/10' : 'odd:bg-[#0e0f14] even:bg-[#101117]'
-                                    }`}
-                                  >
-                                    {isEmpMultiSelectMode && (
-                                      <td className="py-3 px-4">
-                                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${
-                                          isSelected
+                                    <tr
+                                      key={item.emp.id}
+                                      onMouseDown={() => {
+                                        if (!isEmpMultiSelectMode) {
+                                          longPressTimerRef.current = setTimeout(() => {
+                                            setIsEmpMultiSelectMode(true);
+                                            setSelectedEmpReportIds([item.emp.id]);
+                                          }, 600);
+                                        }
+                                      }}
+                                      onMouseUp={() => {
+                                        if (longPressTimerRef.current) {
+                                          clearTimeout(longPressTimerRef.current);
+                                          longPressTimerRef.current = null;
+                                        }
+                                      }}
+                                      onMouseLeave={() => {
+                                        if (longPressTimerRef.current) {
+                                          clearTimeout(longPressTimerRef.current);
+                                          longPressTimerRef.current = null;
+                                        }
+                                      }}
+                                      onTouchStart={() => {
+                                        if (!isEmpMultiSelectMode) {
+                                          longPressTimerRef.current = setTimeout(() => {
+                                            setIsEmpMultiSelectMode(true);
+                                            setSelectedEmpReportIds([item.emp.id]);
+                                          }, 600);
+                                        }
+                                      }}
+                                      onTouchEnd={() => {
+                                        if (longPressTimerRef.current) {
+                                          clearTimeout(longPressTimerRef.current);
+                                          longPressTimerRef.current = null;
+                                        }
+                                      }}
+                                      onClick={() => {
+                                        if (isEmpMultiSelectMode) {
+                                          setSelectedEmpReportIds(prev => {
+                                            if (prev.includes(item.emp.id)) {
+                                              return prev.filter(id => id !== item.emp.id);
+                                            } else {
+                                              return [...prev, item.emp.id];
+                                            }
+                                          });
+                                        } else {
+                                          setSelectedEmpStats(item);
+                                          setSelectedEmpMeetingDetail(item.details[0] || null);
+                                        }
+                                      }}
+                                      className={`cursor-pointer transition-colors hover:bg-[#181921]/60 text-slate-300 ${isSelected ? 'bg-[#00a2e8]/10' : 'odd:bg-[#0e0f14] even:bg-[#101117]'
+                                        }`}
+                                    >
+                                      {isEmpMultiSelectMode && (
+                                        <td className="py-3 px-4">
+                                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isSelected
                                             ? 'border-[#00a2e8] bg-[#00a2e8]'
                                             : 'border-[#2d2f3c] bg-[#111218]'
-                                        }`}>
-                                          {isSelected && <Check size={8} className="text-white font-bold" />}
-                                        </div>
-                                      </td>
-                                    )}
-                                    <td className="py-3 px-4 text-center text-slate-500 font-semibold">{idx + 1}</td>
-                                    <td className="py-3 px-4 font-bold">{item.emp.maGiayTo}</td>
-                                    <td className="py-3 px-4 font-sans font-medium text-slate-100">{item.emp.hoTen}</td>
-                                    <td className="py-3 px-4 text-center text-slate-400 font-bold">{item.requiredCount}</td>
-                                    <td className="py-3 px-4 text-center text-emerald-400 font-bold">{item.presentOnTimeCount}</td>
-                                    <td className="py-3 px-4 text-center text-amber-500 font-bold">{item.lateCount}</td>
-                                    <td className="py-3 px-4 text-center text-rose-400 font-bold">{item.earlyCount}</td>
-                                  </tr>
+                                            }`}>
+                                            {isSelected && <Check size={8} className="text-white font-bold" />}
+                                          </div>
+                                        </td>
+                                      )}
+                                      <td className="py-3 px-4 text-center text-slate-500 font-semibold">{idx + 1}</td>
+                                      <td className="py-3 px-4 font-bold">{item.emp.maGiayTo}</td>
+                                      <td className="py-3 px-4 font-sans font-medium text-slate-100">{item.emp.hoTen}</td>
+                                      <td className="py-3 px-4 text-center text-slate-400 font-bold">{item.requiredCount}</td>
+                                      <td className="py-3 px-4 text-center text-emerald-400 font-bold">{item.presentOnTimeCount}</td>
+                                      <td className="py-3 px-4 text-center text-amber-500 font-bold">{item.lateCount}</td>
+                                      <td className="py-3 px-4 text-center text-rose-400 font-bold">{item.earlyCount}</td>
+                                    </tr>
                                   );
                                 })}
                               </tbody>

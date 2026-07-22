@@ -3,6 +3,7 @@ import {
   Calendar,
   Clock,
   ChevronDown,
+  ChevronUp,
   Check,
   Save,
   Plus,
@@ -214,6 +215,7 @@ export const AccessSchedulePage = () => {
   const [isSavingMeeting, setIsSavingMeeting] = useState<boolean>(false);
   const [meetingSaveError, setMeetingSaveError] = useState<string>('');
   const [deletingMeetingId, setDeletingMeetingId] = useState<string | null>(null);
+  const [showCreateMeetingPanel, setShowCreateMeetingPanel] = useState<boolean>(false);
 
   // Drag states
   const [draggingMeeting, setDraggingMeeting] = useState<any>(null);
@@ -1504,12 +1506,32 @@ export const AccessSchedulePage = () => {
             {/* MEETING BUILDER CONTROLS - SINGLE PANEL */}
             <div className="bg-[#14151b] border border-[#21232d] rounded-2xl p-5 shadow-xl relative">
               <div>
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-4 pb-2 border-b border-slate-800/60 flex items-center space-x-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00a2e8]" />
-                  <span>Tạo cuộc họp mới</span>
-                </h4>
+                <div className={`flex items-center justify-between pb-2 ${showCreateMeetingPanel ? 'border-b border-slate-800/60 mb-4' : ''}`}>
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00a2e8]" />
+                    <span>Tạo cuộc họp mới</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateMeetingPanel(!showCreateMeetingPanel)}
+                    className="text-[11px] font-bold text-[#00a2e8] hover:text-[#008cc9] flex items-center gap-1 focus:outline-none transition-colors"
+                  >
+                    {showCreateMeetingPanel ? (
+                      <>
+                        <span>Thu gọn</span>
+                        <ChevronUp size={14} />
+                      </>
+                    ) : (
+                      <>
+                        <span>Mở rộng</span>
+                        <ChevronDown size={14} />
+                      </>
+                    )}
+                  </button>
+                </div>
 
-                <div className="space-y-4">
+                {showCreateMeetingPanel && (
+                  <div className="space-y-4">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     {/* CỘT TRÁI - THÔNG TIN CUỘC HỌP */}
                     <div className="border border-[#2d2f3c]/50 rounded-2xl p-4.5 space-y-4 bg-[#181921]/15 relative text-left flex flex-col justify-between">
@@ -1861,6 +1883,7 @@ export const AccessSchedulePage = () => {
                     </button>
                   </div>
                 </div>
+                )}
               </div>
             </div>
 
