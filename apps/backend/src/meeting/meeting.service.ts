@@ -769,10 +769,19 @@ export class MeetingService {
     res.send(buf);
   }
 
-  async getDailyAttendanceReport(dateStr: string, areaNames: string[], groupId: string) {
-    const shiftStart = process.env.SHIFT_START_TIME || '07:30';
-    const shiftEnd = process.env.SHIFT_END_TIME || '17:00';
-    const shiftBufferHours = parseInt(process.env.SHIFT_BUFFER_HOURS || '2', 10);
+  async getDailyAttendanceReport(
+    dateStr: string,
+    areaNames: string[],
+    groupId: string,
+    customShiftStart?: string,
+    customShiftEnd?: string,
+    customBufferHours?: number,
+  ) {
+    const shiftStart = customShiftStart || process.env.SHIFT_START_TIME || '07:30';
+    const shiftEnd = customShiftEnd || process.env.SHIFT_END_TIME || '17:00';
+    const shiftBufferHours = customBufferHours !== undefined && !Number.isNaN(customBufferHours)
+      ? customBufferHours
+      : parseInt(process.env.SHIFT_BUFFER_HOURS || '2', 10);
 
     const getOffsetTimeStr = (timeStr: string, offsetHours: number): string => {
       const [h, m] = timeStr.split(':').map(Number);

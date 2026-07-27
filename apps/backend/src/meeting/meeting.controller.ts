@@ -76,9 +76,13 @@ export class MeetingController {
     @Query('date') date: string,
     @Query('areas') areas?: string,
     @Query('groupId') groupId?: string,
+    @Query('shiftStart') shiftStart?: string,
+    @Query('shiftEnd') shiftEnd?: string,
+    @Query('bufferHours') bufferHours?: string,
   ) {
     const areaList = areas ? areas.split(',') : [];
-    return this.meetingService.getDailyAttendanceReport(date, areaList, groupId || 'All');
+    const bufferNum = bufferHours ? parseInt(bufferHours, 10) : undefined;
+    return this.meetingService.getDailyAttendanceReport(date, areaList, groupId || 'All', shiftStart, shiftEnd, bufferNum);
   }
 
   @Get('attendance/range-report')

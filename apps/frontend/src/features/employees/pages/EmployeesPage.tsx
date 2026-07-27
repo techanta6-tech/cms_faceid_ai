@@ -9,6 +9,10 @@ import {
   Sparkles,
   Layers,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Save,
   RefreshCw
 } from 'lucide-react';
@@ -23,6 +27,12 @@ export const EmployeesPage = () => {
   const { employees, setEmployees } = useApp();
 
   const [activeEmployeeSubTab, setActiveEmployeeSubTab] = useState<'employees-list' | 'humanGroups-list' | 'add-employee'>('employees-list');
+
+  // Pagination states for Employee list
+  const [empCurrentPage, setEmpCurrentPage] = useState(1);
+  const [empItemsPerPage, setEmpItemsPerPage] = useState(20);
+  const [isEmpPerPageOpen, setIsEmpPerPageOpen] = useState(false);
+  const EMP_PER_PAGE_OPTIONS = [10, 20, 40, 50, 100];
   const [savedCount, setSavedCount] = useState<number>(0);
 
   interface HumanGroup {
@@ -335,79 +345,136 @@ export const EmployeesPage = () => {
                   </button>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-[#181921] border-b border-[#21232d] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        <th className="p-4 w-12 text-center">STT</th>
-                        <th className="p-4">Nhân sự</th>
-                        <th className="p-4">Giấy tờ tùy thân</th>
-                        <th className="p-4">Nhóm nhân viên</th>
-                        <th className="p-4">Liên hệ</th>
-                        <th className="p-4 w-20 text-center">Hành động</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1e202b]">
-                      {employees.map((emp, index) => (
-                        <tr key={emp.id} className="hover:bg-[#181a24] transition text-xs">
-                          {/* STT */}
-                          <td className="p-4 text-center font-mono text-slate-400">{index + 1}</td>
+                <>
+                  {(() => {
+                    const totalEmpItems = employees.length;
+                    const totalEmpPages = Math.ceil(totalEmpItems / empItemsPerPage) || 1;
+                    const activeEmpPage = Math.min(empCurrentPage, totalEmpPages);
+                    const startIndex = (activeEmpPage - 1) * empItemsPerPage;
+                    const paginatedEmployees = employees.slice(startIndex, startIndex + empItemsPerPage);
 
-                          {/* Profile & Name */}
-                          <td className="p-4">
-                            <div className="flex items-center space-x-3">
-                              {/* Avatar with hover preview if exists */}
-                              <div className="relative group/avatar">
-                                <img
-                                  src={emp.anhDaiDien?.url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120&q=80'}
-                                  alt={emp.hoTen}
-                                  className="w-8 h-8 rounded-full object-cover border border-slate-700/60"
-                                  referrerPolicy="no-referrer"
-                                />
-                                <div className="absolute top-0 left-0 w-8 h-8 rounded-full bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition text-[9px] text-white font-bold pointer-events-none">
-                                  INFO
-                                </div>
-                              </div>
+                    return (
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-[#181921] border-b border-[#21232d] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                <th className="p-4 w-12 text-center">STT</th>
+                                <th className="p-4">Nhân sự</th>
+                                <th className="p-4">Giấy tờ tùy thân</th>
+                                <th className="p-4">Nhóm nhân viên</th>
+                                <th className="p-4">Liên hệ</th>
+                                <th className="p-4 w-20 text-center">Hành động</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#1e202b]">
+                              {paginatedEmployees.map((emp, index) => (
+                                <tr key={emp.id} className="hover:bg-[#181a24] transition text-xs">
+                                  {/* STT */}
+                                  <td className="p-4 text-center font-mono text-slate-400">{startIndex + index + 1}</td>
 
-                              <div>
-                                <div className="font-bold text-slate-100">{emp.hoTen}</div>
-                                <div className="text-[10px] text-slate-500 font-mono mt-0.5">{emp.id}</div>
-                              </div>
-                            </div>
-                          </td>
+                                  {/* Profile & Name */}
+                                  <td className="p-4">
+                                    <div className="flex items-center space-x-3">
+                                      {/* Avatar with hover preview if exists */}
+                                      <div className="relative group/avatar">
+                                        <img
+                                          src={emp.anhDaiDien?.url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120&q=80'}
+                                          alt={emp.hoTen}
+                                          className="w-8 h-8 rounded-full object-cover border border-slate-700/60"
+                                          referrerPolicy="no-referrer"
+                                        />
+                                        <div className="absolute top-0 left-0 w-8 h-8 rounded-full bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition text-[9px] text-white font-bold pointer-events-none">
+                                          INFO
+                                        </div>
+                                      </div>
 
-                          {/* Identity papers */}
-                          <td className="p-4">
-                            <div className="font-semibold text-slate-300">{emp.maGiayTo}</div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">Loại: {emp.loaiGiayTo || 'CCCD'}</div>
-                          </td>
+                                      <div>
+                                        <div className="font-bold text-slate-100">{emp.hoTen}</div>
+                                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">{emp.id}</div>
+                                      </div>
+                                    </div>
+                                  </td>
 
-                          {/* Departments badge array */}
-                          <td className="p-4">
-                            <div className="flex flex-wrap gap-1">
-                              {emp.human_group && emp.human_group.map((p: string, pIdx: number) => (
-                                <span
-                                  key={pIdx}
-                                  className="px-2 py-0.5 rounded bg-[#00a2e8]/10 text-[#00a2e8] text-[10px] font-bold border border-[#00a2e8]/20"
-                                >
-                                  {p}
-                                </span>
+                                  {/* Identity papers */}
+                                  <td className="p-4">
+                                    <div className="font-semibold text-slate-300">{emp.maGiayTo}</div>
+                                    <div className="text-[10px] text-slate-500 mt-0.5">Loại: {emp.loaiGiayTo || 'CCCD'}</div>
+                                  </td>
+
+                                  {/* Departments badge array */}
+                                  <td className="p-4">
+                                    <div className="flex flex-wrap gap-1">
+                                      {emp.human_group && emp.human_group.map((p: string, pIdx: number) => (
+                                        <span
+                                          key={pIdx}
+                                          className="px-2 py-0.5 rounded bg-[#00a2e8]/10 text-[#00a2e8] text-[10px] font-bold border border-[#00a2e8]/20"
+                                        >
+                                          {p}
+                                        </span>
+                                      ))}
+                                      {(!emp.human_group || emp.human_group.length === 0) && (
+                                        <span className="text-[10px] text-slate-500 italic">Chưa xếp phòng</span>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Contact */}
+                                  <td className="p-4">
+                                    <div className="text-slate-300 font-medium">{emp.soDienThoai && emp.soDienThoai !== 'Chưa cập nhật' ? emp.soDienThoai : 'N/A'}</div>
+                                    <div className="text-[10px] text-slate-500 mt-0.5">{emp.email && emp.email !== 'Chưa cập nhật' ? emp.email : 'N/A'}</div>
+                                  </td>
+
+                                  {/* Actions */}
+                                  <td className="p-4 text-center">
+                                  </td>
+                                </tr>
                               ))}
-                              {(!emp.human_group || emp.human_group.length === 0) && (
-                                <span className="text-[10px] text-slate-500 italic">Chưa xếp phòng</span>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Pagination Footer (matching ReportPage UI) */}
+                        <div className="h-14 bg-[#14151c] border-t border-[#21232d] px-4 flex items-center justify-between shrink-0">
+                          {/* Left: items-per-page selector */}
+                          <div className="flex items-center space-x-2">
+                            <div className="relative">
+                              <button
+                                onClick={() => setIsEmpPerPageOpen(prev => !prev)}
+                                className="flex items-center space-x-1.5 px-2.5 py-1 bg-[#1f202b] rounded hover:bg-[#2c2d3c] text-slate-300 hover:text-white transition text-xs font-mono"
+                                title="Số hàng mỗi trang"
+                              >
+                                <span>{empItemsPerPage} / trang</span>
+                                <ChevronDown size={11} className={`transition-transform duration-150 ${isEmpPerPageOpen ? 'rotate-180' : ''}`} />
+                              </button>
+
+                              {isEmpPerPageOpen && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-30"
+                                    onClick={() => setIsEmpPerPageOpen(false)}
+                                  />
+                                  <div className="absolute bottom-full left-0 mb-1 z-40 bg-[#1a1b25] border border-[#2d2f3e] rounded-lg shadow-xl overflow-hidden">
+                                    {EMP_PER_PAGE_OPTIONS.map(opt => (
+                                      <button
+                                        key={opt}
+                                        onClick={() => {
+                                          setEmpItemsPerPage(opt);
+                                          setEmpCurrentPage(1);
+                                          setIsEmpPerPageOpen(false);
+                                        }}
+                                        className={`w-full px-5 py-1.5 text-xs text-left transition whitespace-nowrap ${opt === empItemsPerPage
+                                          ? 'bg-[#00a2e8]/15 text-[#00a2e8] font-semibold'
+                                          : 'text-slate-300 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8]'
+                                          }`}
+                                      >
+                                        {opt} / trang
+                                      </button>
+                                    ))}
+                                  </div>
+                                </>
                               )}
                             </div>
-                          </td>
-
-                          {/* Contact */}
-                          <td className="p-4">
-                            <div className="text-slate-300 font-medium">{emp.soDienThoai && emp.soDienThoai !== 'Chưa cập nhật' ? emp.soDienThoai : 'N/A'}</div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">{emp.email && emp.email !== 'Chưa cập nhật' ? emp.email : 'N/A'}</div>
-                          </td>
-
-                          {/* Actions */}
-                          <td className="p-4 text-center">
-                            {/* Nút X (xóa) đã ẩn theo yêu cầu */}
                             {/* <button
                               onClick={() => {
                                 if (confirm(`Bạn có chắc chắn muốn xóa nhân sự "${emp.hoTen}" khỏi hệ thống không?`)) {

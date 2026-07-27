@@ -36,7 +36,8 @@ import {
   CalendarClock,
   Save,
   Info,
-  Video
+  Video,
+  SlidersHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 // @ts-ignore
@@ -171,7 +172,7 @@ export const ReportPage = () => {
   const [isOpenListDropdown, setIsOpenListDropdown] = useState(false);
   const [zoneSearch, setZoneSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isPerPageOpen, setIsPerPageOpen] = useState(false);
   const [isEventExportOpen, setIsEventExportOpen] = useState(false);
   const [isMeetingExportOpen, setIsMeetingExportOpen] = useState(false);
@@ -563,14 +564,20 @@ export const ReportPage = () => {
           exitEvent = match.exitEvent || null;
         }
       } else {
+        const windowStartSec = Math.max(0, meetingStartSec - 1800);
+        const windowEndSec = Math.min(86400, meetingEndSec + 1800);
+
         const empLogs = eventLogs.filter(log => {
           if (log.ma !== emp.maGiayTo) return false;
           if (!log.thoiGian) return false;
-          const [datePart] = log.thoiGian.split('-');
-          if (!datePart) return false;
+          const [datePart, timePart] = log.thoiGian.split('-');
+          if (!datePart || !timePart) return false;
           const [day, month, year] = datePart.split('/');
           const logDateStr = `${year}-${month}-${day}`;
-          return logDateStr === meetingDate;
+          if (logDateStr !== meetingDate) return false;
+
+          const logSec = timeStringToSeconds(timePart);
+          return logSec >= windowStartSec && logSec <= windowEndSec;
         });
 
         const sortedEmpLogs = [...empLogs].sort((a, b) => {
@@ -609,9 +616,19 @@ export const ReportPage = () => {
         const spentSec = outSec - inSec;
         const ratio = Math.max(0, Math.min(100, Math.round((spentSec / meetingDur) * 100)));
         ratioPercent = ratio;
-        if (ratio > 95) {
+
+        const isLate = inSec > meetingStartSec;
+        const isEarly = outSec < meetingEndSec;
+
+        if (!isLate && !isEarly) {
           evaluationText = "Hoàn thành tốt";
           evaluationType = 'good';
+        } else if (isLate && isEarly) {
+          evaluationText = "Đi muộn & Rời sớm";
+          evaluationType = 'early';
+        } else if (isLate) {
+          evaluationText = "Đi muộn";
+          evaluationType = 'early';
         } else {
           evaluationText = "Rời phòng sớm";
           evaluationType = 'early';
@@ -781,13 +798,20 @@ export const ReportPage = () => {
   }, [areasData, prevAreasKey]);
 
   // Attendance Report states
+  const getTodayStr = () => new Date().toISOString().split('T')[0];
   const [attendanceType, setAttendanceType] = useState<string>('Báo cáo theo ngày');
-  const [attendanceStartDate, setAttendanceStartDate] = useState<string>('2026-07-09');
-  const [attendanceEndDate, setAttendanceEndDate] = useState<string>('2026-07-09');
+  const [attendanceStartDate, setAttendanceStartDate] = useState<string>(getTodayStr);
+  const [attendanceEndDate, setAttendanceEndDate] = useState<string>(getTodayStr);
   const [attendanceGroup, setAttendanceGroup] = useState<string>('All');
   const [isAttTypeOpen, setIsAttTypeOpen] = useState<boolean>(false);
   const [isAttGroupOpen, setIsAttGroupOpen] = useState<boolean>(false);
   const [isAttExportOpen, setIsAttExportOpen] = useState<boolean>(false);
+
+  // Custom Shift & Grace time states for Daily Attendance Report
+  const [isExpandShiftOpen, setIsExpandShiftOpen] = useState<boolean>(false);
+  const [customShiftStart, setCustomShiftStart] = useState<string>('07:30');
+  const [customShiftEnd, setCustomShiftEnd] = useState<string>('17:00');
+  const [customBufferHours, setCustomBufferHours] = useState<number>(2);
   const [attendanceExportFormat, setAttendanceExportFormat] = useState<'XLSX' | 'PDF'>('XLSX');
   const [exportedFileName, setExportedFileName] = useState<string>('ThongKeSuKien_DVMS.xlsx');
   const [selectedAttendanceEmpCode, setSelectedAttendanceEmpCode] = useState<string | null>(null);
@@ -846,7 +870,7 @@ export const ReportPage = () => {
 
   // Dynamic Work Hours calculation helper
   const calculateWorkHours = useCallback((checkInStr: string, checkOutStr: string): string => {
-    if (checkInStr === 'Trống' || checkOutStr === 'Trống') return '0 h';
+    if (!checkInStr || checkInStr === 'Trống' || checkInStr === 'Không có dữ liệu' || !checkOutStr || checkOutStr === 'Trống' || checkOutStr === 'Không có dữ liệu') return '0 h';
 
     const [inH, inM, inS] = checkInStr.split(':').map(Number);
     const [outH, outM, outS] = checkOutStr.split(':').map(Number);
@@ -900,7 +924,7 @@ export const ReportPage = () => {
         const baseUrl = getBackendUrl();
         const areasParam = encodeURIComponent(selectedAttendanceAreas.join(','));
         const res = await fetch(
-          `${baseUrl}/meeting/attendance/daily-report?date=${attendanceStartDate}&areas=${areasParam}&groupId=${attendanceGroup}`
+          `${baseUrl}/meeting/attendance/daily-report?date=${attendanceStartDate}&areas=${areasParam}&groupId=${attendanceGroup}&shiftStart=${encodeURIComponent(customShiftStart)}&shiftEnd=${encodeURIComponent(customShiftEnd)}&bufferHours=${customBufferHours}`
         );
         if (res.ok && !isCancelled) {
           const data = await res.json();
@@ -914,7 +938,7 @@ export const ReportPage = () => {
     };
     fetchDailyReport();
     return () => { isCancelled = true; };
-  }, [attendanceStartDate, selectedAttendanceAreas, attendanceGroup, attendanceType]);
+  }, [attendanceStartDate, selectedAttendanceAreas, attendanceGroup, attendanceType, customShiftStart, customShiftEnd, customBufferHours]);
 
   // Range (Weekly/Monthly) Attendance DB Query states & effect
   const [rangeReportData, setRangeReportData] = useState<any[]>([]);
@@ -972,8 +996,8 @@ export const ReportPage = () => {
         return {
           dayName,
           dateStr,
-          checkIn: 'Trống',
-          checkOut: 'Trống',
+          checkIn: 'Không có dữ liệu',
+          checkOut: 'Không có dữ liệu',
           totalHours: '0 h'
         };
       }
@@ -1035,8 +1059,8 @@ export const ReportPage = () => {
         logs.push({
           dayName,
           dateStr,
-          checkIn: 'Trống',
-          checkOut: 'Trống',
+          checkIn: 'Không có dữ liệu',
+          checkOut: 'Không có dữ liệu',
           totalHours: '0 h'
         });
         continue;
@@ -2237,11 +2261,11 @@ export const ReportPage = () => {
           if (isDaily) {
             return {
               'STT': idx + 1,
-              'Mã NV': item.ma || '',
-              'Họ và Tên': item.ten || '',
-              'Nhóm / nhóm nhân viên': item.danhSach || '',
-              'Giờ Vào': item.thoiGianVao || 'Trống',
-              'Giờ Ra': item.thoiGianRa || 'Trống',
+              'Mã NV': item.ma || 'Không có dữ liệu',
+              'Họ và Tên': item.ten || 'Không có dữ liệu',
+              'Nhóm / nhóm nhân viên': item.danhSach || 'Không có dữ liệu',
+              'Giờ Vào': (item.thoiGianVao && item.thoiGianVao !== 'Trống' && item.thoiGianVao !== 'Không có dữ liệu') ? item.thoiGianVao : 'Không có dữ liệu',
+              'Giờ Ra': (item.thoiGianRa && item.thoiGianRa !== 'Trống' && item.thoiGianRa !== 'Không có dữ liệu') ? item.thoiGianRa : 'Không có dữ liệu',
               'Tổng giờ': item.totalHours || '0 h',
             };
           } else {
@@ -2364,8 +2388,8 @@ export const ReportPage = () => {
               return {
                 dayName,
                 dateStr: log.date,
-                checkIn: log.thoiGianVao || 'Trống',
-                checkOut: log.thoiGianRa || 'Trống',
+                checkIn: (log.thoiGianVao && log.thoiGianVao !== 'Trống' && log.thoiGianVao !== 'Không có dữ liệu') ? log.thoiGianVao : 'Không có dữ liệu',
+                checkOut: (log.thoiGianRa && log.thoiGianRa !== 'Trống' && log.thoiGianRa !== 'Không có dữ liệu') ? log.thoiGianRa : 'Không có dữ liệu',
                 totalHours: log.hours ? `${Math.round(log.hours * 100) / 100} h` : '0 h',
               };
             });
@@ -2379,10 +2403,10 @@ export const ReportPage = () => {
             const formattedLogs = logs.map((log: any, idx: number) => ({
               'STT': idx + 1,
               'Thứ / Ngày': `${log.dayName} (${log.dateStr.split('-').reverse().slice(0, 2).join('/')})`,
-              'Làm lúc': log.checkIn || 'Trống',
-              'Đến lúc': log.checkOut || 'Trống',
+              'Làm lúc': (log.checkIn && log.checkIn !== 'Trống' && log.checkIn !== 'Không có dữ liệu') ? log.checkIn : 'Không có dữ liệu',
+              'Đến lúc': (log.checkOut && log.checkOut !== 'Trống' && log.checkOut !== 'Không có dữ liệu') ? log.checkOut : 'Không có dữ liệu',
               'Tổng giờ ngày': log.totalHours || '0 h',
-              'Trạng thái': log.checkIn === 'Trống' ? 'Nghỉ' : 'Có mặt',
+              'Trạng thái': (!log.checkIn || log.checkIn === 'Trống' || log.checkIn === 'Không có dữ liệu') ? 'Nghỉ' : 'Có mặt',
             }));
 
             const empInfoRows = [
@@ -2701,7 +2725,7 @@ export const ReportPage = () => {
 
               {/* Active Filter Pill display */}
               <div className="flex items-center space-x-2 text-[10px]">
-                {(appliedZone !== 'All' || appliedSearch) && (
+                {(appliedZone !== 'All' || appliedSearch || appliedEventType !== 'All') && (
                   <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
                     Đang lọc kết quả
                   </span>
@@ -3143,8 +3167,8 @@ export const ReportPage = () => {
           const dailyRoster = (() => {
             return activeRealEmployees.map((emp: any) => {
               const match = dailyReportData.find((item: any) => item.employeeId === emp.id);
-              const thoiGianVao = match ? (match.thoiGianVao || 'Trống') : 'Trống';
-              const thoiGianRa = match ? (match.thoiGianRa || 'Trống') : 'Trống';
+              const thoiGianVao = match ? ((match.thoiGianVao && match.thoiGianVao !== 'Trống') ? match.thoiGianVao : 'Không có dữ liệu') : 'Không có dữ liệu';
+              const thoiGianRa = match ? ((match.thoiGianRa && match.thoiGianRa !== 'Trống') ? match.thoiGianRa : 'Không có dữ liệu') : 'Không có dữ liệu';
               const entryEvent = match ? (match.entryEvent || null) : null;
               const exitEvent = match ? (match.exitEvent || null) : null;
               return {
@@ -3506,8 +3530,73 @@ export const ReportPage = () => {
                       </>
                     )}
 
-                    {/* Combined Export Split Button (XLSX Dropdown) */}
-                    <div className="md:col-span-2 flex items-center justify-end relative h-[42px]">
+                    {/* Combined Export Split Button (XLSX Dropdown) & Expand Shift Settings */}
+                    <div className="md:col-span-2 flex items-center justify-end space-x-2 relative h-[42px]">
+                      {attendanceType === 'Báo cáo theo ngày' && (
+                        <div className="relative shrink-0 h-full">
+                          <button
+                            type="button"
+                            onClick={() => setIsExpandShiftOpen(!isExpandShiftOpen)}
+                            className={`h-full px-3 border rounded-xl flex items-center space-x-1.5 text-xs font-semibold transition-all cursor-pointer ${isExpandShiftOpen
+                                ? 'bg-[#00a2e8]/15 text-[#00a2e8] border-[#00a2e8]'
+                                : 'bg-[#1c1d26] text-slate-300 border-[#2d2f3c] hover:bg-[#252735] hover:text-white'
+                              }`}
+                            title="Tùy chỉnh giờ ca làm & mở/đóng cổng"
+                          >
+                            {/* <SlidersHorizontal size={13} /> */}
+                            <span>Ca làm</span>
+                            <ChevronDown size={12} className={`transition-transform duration-200 ${isExpandShiftOpen ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {isExpandShiftOpen && (
+                            <>
+                              <div className="fixed inset-0 z-30" onClick={() => setIsExpandShiftOpen(false)} />
+                              <div className="absolute right-0 top-full mt-2 w-72 bg-[#181922] border border-[#2d2f3c] rounded-xl shadow-2xl p-3.5 z-40 text-left space-y-3 font-sans">
+                                <div className="text-[11px] font-bold text-[#00a2e8] uppercase tracking-wider flex items-center justify-between border-b border-[#292b3a] pb-2">
+                                  <span>Cấu hình Ca & Grace time</span>
+                                  <button onClick={() => setIsExpandShiftOpen(false)} className="text-slate-400 hover:text-white">
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-[10px] text-slate-400 block mb-1">Giờ bắt đầu ca</label>
+                                    <input
+                                      type="text"
+                                      value={customShiftStart}
+                                      onChange={(e) => setCustomShiftStart(e.target.value)}
+                                      placeholder="07:30"
+                                      className="w-full bg-[#111218] border border-[#2d2f3c] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#00a2e8] font-mono"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] text-slate-400 block mb-1">Giờ kết thúc ca</label>
+                                    <input
+                                      type="text"
+                                      value={customShiftEnd}
+                                      onChange={(e) => setCustomShiftEnd(e.target.value)}
+                                      placeholder="17:00"
+                                      className="w-full bg-[#111218] border border-[#2d2f3c] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#00a2e8] font-mono"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="text-[10px] text-slate-400 block mb-1">Thời gian mở/đóng cổng (Grace time - giờ)</label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={12}
+                                    value={customBufferHours}
+                                    onChange={(e) => setCustomBufferHours(parseInt(e.target.value, 10) || 0)}
+                                    className="w-full bg-[#111218] border border-[#2d2f3c] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#00a2e8] font-mono"
+                                  />
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex h-full w-full rounded-xl overflow-hidden shadow-lg border border-[#2d2f3c] bg-[#1c1d26]">
                         <button
                           type="button"
@@ -3609,8 +3698,8 @@ export const ReportPage = () => {
                         return {
                           dayName,
                           dateStr: log.date,
-                          checkIn: log.thoiGianVao || 'Trống',
-                          checkOut: log.thoiGianRa || 'Trống',
+                          checkIn: (log.thoiGianVao && log.thoiGianVao !== 'Trống' && log.thoiGianVao !== 'Không có dữ liệu') ? log.thoiGianVao : 'Không có dữ liệu',
+                          checkOut: (log.thoiGianRa && log.thoiGianRa !== 'Trống' && log.thoiGianRa !== 'Không có dữ liệu') ? log.thoiGianRa : 'Không có dữ liệu',
                           totalHours: log.hours ? `${Math.round(log.hours * 100) / 100} h` : '0 h',
                           entryEvent: log.entryEvent || null,
                           exitEvent: log.exitEvent || null,
@@ -3641,7 +3730,7 @@ export const ReportPage = () => {
                               <tbody className="divide-y divide-[#1b1c24] text-xs font-mono">
                                 {logs.map((log) => {
                                   const isSelected = activeLog.dateStr === log.dateStr;
-                                  const hasNoLog = log.checkIn === 'Trống';
+                                  const hasNoLog = !log.checkIn || log.checkIn === 'Trống' || log.checkIn === 'Không có dữ liệu';
 
                                   return (
                                     <tr
@@ -3680,7 +3769,7 @@ export const ReportPage = () => {
 
                           {/* Right Column: Camera photos for selected day */}
                           <div className="w-80 bg-[#14151c]/95 flex flex-col shrink-0 overflow-y-auto border-l border-[#21232d]/40">
-                            {activeLog && activeLog.checkIn !== 'Trống' ? (
+                            {activeLog && activeLog.checkIn !== 'Trống' && activeLog.checkIn !== 'Không có dữ liệu' ? (
                               <div className="p-4 space-y-4 text-left">
                                 <div className="pb-3 border-b border-[#2d2f3c]/60">
                                   <h4 className="font-bold text-xs text-white uppercase tracking-wider">
@@ -3859,8 +3948,8 @@ export const ReportPage = () => {
                                           <td className="py-2.5 px-4 text-amber-500 font-bold">{emp.ma}</td>
                                           <td className={`py-2.5 px-4 font-sans font-medium ${(isSelected && !isWeeklyOrMonthly) ? 'text-[#00a2e8]' : 'text-slate-100'}`}>{emp.ten}</td>
                                           <td className="py-2.5 px-4 font-sans">{emp.danhSach}</td>
-                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianVao !== 'Trống' ? emp.thoiGianVao : <span className="text-slate-600">Trống</span>}</td>}
-                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianRa !== 'Trống' ? emp.thoiGianRa : <span className="text-slate-600">Trống</span>}</td>}
+                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianVao && emp.thoiGianVao !== 'Trống' && emp.thoiGianVao !== 'Không có dữ liệu' ? emp.thoiGianVao : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
+                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianRa && emp.thoiGianRa !== 'Trống' && emp.thoiGianRa !== 'Không có dữ liệu' ? emp.thoiGianRa : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
                                           <td className="py-2.5 px-4 text-white">{emp.totalHours || '0 h'}</td>
                                         </tr>
                                       );
@@ -4017,8 +4106,8 @@ export const ReportPage = () => {
                               <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
                                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ảnh lúc vào</span>
-                                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${selectedAttendee.thoiGianVao === 'Trống' || !selectedAttendee.thoiGianVao ? 'text-slate-500 bg-slate-500/10 border-slate-500/10' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'}`}>
-                                    {selectedAttendee.thoiGianVao || 'Trống'}
+                                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${!selectedAttendee.thoiGianVao || selectedAttendee.thoiGianVao === 'Trống' || selectedAttendee.thoiGianVao === 'Không có dữ liệu' ? 'text-slate-500 bg-slate-500/10 border-slate-500/10' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'}`}>
+                                    {selectedAttendee.thoiGianVao && selectedAttendee.thoiGianVao !== 'Trống' && selectedAttendee.thoiGianVao !== 'Không có dữ liệu' ? selectedAttendee.thoiGianVao : 'Không có dữ liệu'}
                                   </span>
                                 </div>
                                 <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-[#2d2f3c] bg-[#0d0e12] flex items-center justify-center shadow-inner">
@@ -4052,8 +4141,8 @@ export const ReportPage = () => {
                               <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
                                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ảnh lúc ra</span>
-                                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${selectedAttendee.thoiGianRa === 'Trống' ? 'text-slate-500 bg-slate-500/10 border-slate-500/10' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'}`}>
-                                    {selectedAttendee.thoiGianRa || 'Trống'}
+                                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${!selectedAttendee.thoiGianRa || selectedAttendee.thoiGianRa === 'Trống' || selectedAttendee.thoiGianRa === 'Không có dữ liệu' ? 'text-slate-500 bg-slate-500/10 border-slate-500/10' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'}`}>
+                                    {selectedAttendee.thoiGianRa && selectedAttendee.thoiGianRa !== 'Trống' && selectedAttendee.thoiGianRa !== 'Không có dữ liệu' ? selectedAttendee.thoiGianRa : 'Không có dữ liệu'}
                                   </span>
                                 </div>
                                 <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-[#2d2f3c] bg-[#0d0e12] flex items-center justify-center shadow-inner">
@@ -4622,7 +4711,7 @@ export const ReportPage = () => {
                                         ? 'text-slate-500 bg-slate-500/10 border-slate-500/10'
                                         : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
                                         }`}>
-                                        {activeDetail.thoiGianVao || 'Trống'}
+                                        {activeDetail.thoiGianVao && activeDetail.thoiGianVao !== 'Trống' && activeDetail.thoiGianVao !== 'Không có dữ liệu' ? activeDetail.thoiGianVao : 'Không có dữ liệu'}
                                       </span>
                                     </div>
                                     <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-[#2d2f3c] bg-[#0d0e12] flex items-center justify-center shadow-inner">
@@ -4657,7 +4746,7 @@ export const ReportPage = () => {
                                         ? 'text-slate-500 bg-slate-500/10 border-slate-500/10'
                                         : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
                                         }`}>
-                                        {activeDetail.thoiGianRa || 'Trống'}
+                                        {activeDetail.thoiGianRa && activeDetail.thoiGianRa !== 'Trống' && activeDetail.thoiGianRa !== 'Không có dữ liệu' ? activeDetail.thoiGianRa : 'Không có dữ liệu'}
                                       </span>
                                     </div>
                                     <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-[#2d2f3c] bg-[#0d0e12] flex items-center justify-center shadow-inner">
@@ -5602,9 +5691,9 @@ export const ReportPage = () => {
                   </div>
                 </div>
 
-                {/* 6. Loại sự kiện (New dropdown option) */}
+                {/* 6. Hướng (Tất cả | Vào | Ra) */}
                 <div className="space-y-1 text-left relative">
-                  <label className="text-[11px] text-slate-300 font-semibold block">Loại sự kiện</label>
+                  <label className="text-[11px] text-slate-300 font-semibold block">Hướng</label>
                   <div className="relative">
                     <button
                       type="button"
@@ -5612,7 +5701,7 @@ export const ReportPage = () => {
                       className="w-full bg-[#181921] border border-[#2d2f3c] hover:border-[#00a2e8] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none"
                     >
                       <span>
-                        {filterEventType === 'All' ? 'Tất Cả' : filterEventType === 'in' ? 'Đi vào' : 'Đi ra'}
+                        {filterEventType === 'All' ? 'Tất cả' : filterEventType === 'in' ? 'Vào' : 'Ra'}
                       </span>
                       <ChevronDown size={14} className="text-[#00a2e8]" />
                     </button>
@@ -5627,9 +5716,9 @@ export const ReportPage = () => {
                         >
                           <div className="max-h-40 overflow-y-auto">
                             {[
-                              { id: 'All', name: 'Tất Cả' },
-                              { id: 'in', name: 'Đi vào' },
-                              { id: 'out', name: 'Đi ra' }
+                              { id: 'All', name: 'Tất cả' },
+                              { id: 'in', name: 'Vào' },
+                              { id: 'out', name: 'Ra' }
                             ].map(opt => (
                               <button
                                 key={opt.id}
@@ -5994,13 +6083,13 @@ export const ReportPage = () => {
                   <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: '500', textAlign: 'left' }}>{row.ten || ''}</td>
                   <td style={{ border: '1px solid #D1D5DB', padding: '8px', textAlign: 'left' }}>{row.danhSach || ''}</td>
                   {attendanceType === 'Báo cáo theo ngày' && (
-                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontFamily: 'monospace', color: row.thoiGianVao === 'Trống' ? '#9CA3AF' : '#059669' }}>
-                      {row.thoiGianVao}
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontFamily: 'monospace', color: (!row.thoiGianVao || row.thoiGianVao === 'Trống' || row.thoiGianVao === 'Không có dữ liệu') ? '#9CA3AF' : '#059669' }}>
+                      {(!row.thoiGianVao || row.thoiGianVao === 'Trống' || row.thoiGianVao === 'Không có dữ liệu') ? 'Không có dữ liệu' : row.thoiGianVao}
                     </td>
                   )}
                   {attendanceType === 'Báo cáo theo ngày' && (
-                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontFamily: 'monospace', color: row.thoiGianRa === 'Trống' ? '#9CA3AF' : '#059669' }}>
-                      {row.thoiGianRa}
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontFamily: 'monospace', color: (!row.thoiGianRa || row.thoiGianRa === 'Trống' || row.thoiGianRa === 'Không có dữ liệu') ? '#9CA3AF' : '#059669' }}>
+                      {(!row.thoiGianRa || row.thoiGianRa === 'Trống' || row.thoiGianRa === 'Không có dữ liệu') ? 'Không có dữ liệu' : row.thoiGianRa}
                     </td>
                   )}
                   <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold' }}>{row.totalHours || '0 h'}</td>
