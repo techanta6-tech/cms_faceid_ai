@@ -2297,7 +2297,7 @@ export const ReportPage = () => {
     const infoRows = [
       ['DANH SÁCH SỰ KIỆN GHI NHẬN', '', '', '', '', '', '', '', ''],
       ['Tìm kiếm:', appliedSearch || 'Tất cả', 'Khu vực:', appliedZones.length > 0 ? appliedZones.join(', ') : (appliedZone === 'All' ? 'Tất cả' : appliedZone), '', '', '', '', ''],
-      ['Phòng ban:', appliedList === 'All' ? 'Tất cả' : appliedList, 'Loại sự kiện:', appliedEventType === 'All' ? 'Tất cả' : (appliedEventType === 'in' ? 'Đi vào' : 'Đi ra'), '', '', '', '', ''],
+      ['Phòng ban:', appliedList === 'All' ? 'Tất cả' : (humanGroups.find(g => g.id === appliedList)?.name || appliedList), 'Loại sự kiện:', appliedEventType === 'All' ? 'Tất cả' : (appliedEventType === 'in' ? 'Đi vào' : 'Đi ra'), '', '', '', '', ''],
       ['Từ ngày:', appliedStartDate || 'Không giới hạn', 'Đến ngày:', appliedEndDate || 'Không giới hạn', '', '', '', '', ''],
       [],
     ];
@@ -6456,7 +6456,7 @@ export const ReportPage = () => {
               </tr>
               <tr>
                 <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6' }}>Danh sách:</td>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{appliedList === 'All' ? 'Tất cả' : appliedList}</td>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{appliedList === 'All' ? 'Tất cả' : (humanGroups.find(g => g.id === appliedList)?.name || appliedList)}</td>
                 <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6' }}>Loại sự kiện:</td>
                 <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{appliedEventType === 'All' ? 'Tất cả' : (appliedEventType === 'in' ? 'Đi vào' : 'Đi ra')}</td>
               </tr>
