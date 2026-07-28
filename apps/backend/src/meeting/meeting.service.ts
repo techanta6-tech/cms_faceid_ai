@@ -533,7 +533,20 @@ export class MeetingService {
         locationNameByCameraId.set(bind.camera_id, bind.location.name);
       }
     }
-    return { listMap, locationNameByCameraId };
+
+    const cameraNameByCameraId = new Map<string, string>();
+    try {
+      const cams = await this.lcms.$queryRawUnsafe<any[]>(`SELECT id, name FROM camera_cfg`);
+      for (const c of cams) {
+        if (c.id && c.name) {
+          cameraNameByCameraId.set(c.id, c.name);
+        }
+      }
+    } catch (e) {
+      // ignore table query errors if missing
+    }
+
+    return { listMap, locationNameByCameraId, cameraNameByCameraId };
   }
 
   private async buildEventConditions(
@@ -635,7 +648,7 @@ export class MeetingService {
     return `${day}/${month}/${year}-${hour}:${minute}:${second}`;
   }
 
-  private mapRawEvent(e: any, index: number, listMap: Map<string, string>, locationNameByCameraId: Map<string, string>, pageOffset = 0) {
+  private mapRawEvent(e: any, index: number, listMap: Map<string, string>, locationNameByCameraId: Map<string, string>, cameraNameByCameraId: Map<string, string>, pageOffset = 0) {
     let faceImgBase64: string | null = null;
     if (e.cropped_face_images) {
       const buffers = e.cropped_face_images;
@@ -654,11 +667,14 @@ export class MeetingService {
 
     const pb = (e.list_ids || []).map((lid: string) => listMap.get(lid) || lid);
     const groupStr = pb.join(', ') || 'Mặc định';
-    const areaName = e.camera_event_id ? locationNameByCameraId.get(e.camera_event_id) : undefined;
-    const displayArea = areaName || e.area_name || 'Không xác định';
-    const cameraName = e.camera_name || e.camera_friendly_name || e.camera_event_id || 'Camera 01';
+    const isUUID = (str?: string) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    const vmsCamName = e.camera_event_id ? cameraNameByCameraId.get(e.camera_event_id) : undefined;
+    let cameraName = e.camera_name || e.camera_friendly_name;
+    if (!cameraName || isUUID(cameraName)) {
+      cameraName = vmsCamName || e.camera_event_id || 'Camera 01';
+    }
     let huong = 'Vào';
-    if (displayArea.toLowerCase().includes('checkout') || (e.camera_name && e.camera_name.toLowerCase().includes('checkout'))) {
+    if (displayArea.toLowerCase().includes('checkout') || (cameraName && cameraName.toLowerCase().includes('checkout'))) {
       huong = 'Ra';
     }
 
@@ -745,7 +761,7 @@ export class MeetingService {
     const limit  = parsedLimit === -1 ? 1000000 : Math.min(500, Math.max(1, parsedLimit));
     const offset = parsedLimit === -1 ? 0 : (page - 1) * limit;
 
-    const { listMap, locationNameByCameraId } = await this.buildLookupMaps();
+    const { listMap, locationNameByCameraId, cameraNameByCameraId } = await this.buildLookupMaps();
 
     let cameraIds: string[] | undefined = undefined;
     if (opts.eventType && opts.eventType !== 'All') {
@@ -824,7 +840,7 @@ export class MeetingService {
         });
       }
 
-      const data = eventsWithImages.map((e, idx) => this.mapRawEvent(e, idx, listMap, locationNameByCameraId, offset));
+      const data = eventsWithImages.map((e, idx) => this.mapRawEvent(e, idx, listMap, locationNameByCameraId, cameraNameByCameraId, offset));
       console.log(`[DEBUG Backend] Map dữ liệu thành công. Tổng số bản ghi (total): ${total}, Số bản ghi trả về trang này: ${data.length}`);
 
       return { data, total, page, limit };
@@ -856,7 +872,7 @@ export class MeetingService {
         .filter(Boolean);
     }
 
-    const { locationNameByCameraId } = await this.buildLookupMaps();
+    const { locationNameByCameraId, cameraNameByCameraId } = await this.buildLookupMaps();
     const where = await this.buildEventConditions(opts, cameraIds);
     const query = `
       SELECT

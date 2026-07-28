@@ -982,6 +982,26 @@ export const ReportPage = () => {
     }
   }, [areasData, prevAttendanceAreasKey]);
 
+  // Helper to resolve camera name from areasData context if backend returns a raw UUID
+  const resolveCameraName = useCallback((log: EventLog | any) => {
+    const rawCamName = log.camera_name;
+    const isUUID = (str?: string) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+    const camId = log.camera_id || (isUUID(rawCamName) ? rawCamName : null);
+    if (camId && areasData && areasData.length > 0) {
+      for (const area of areasData) {
+        const foundCam = area.cameras?.find(c => c.camera_id === camId);
+        if (foundCam && foundCam.camera_name && foundCam.camera_name !== 'Unknown') {
+          return foundCam.camera_name;
+        }
+      }
+    }
+    if (rawCamName && !isUUID(rawCamName)) {
+      return rawCamName;
+    }
+    return log.camera_id || rawCamName || 'Camera 01';
+  }, [areasData]);
+
   // Helper to extract time only (HH:mm:ss or HH:mm) from datetime string
   const formatTimeOnly = useCallback((timeStr: string): string => {
     if (!timeStr || timeStr === 'Trống' || timeStr === 'Không có dữ liệu') return timeStr;
@@ -2260,7 +2280,7 @@ export const ReportPage = () => {
     const formattedRows = rows.map((item, idx) => {
       const areaSuffix = getAreaSuffix(item);
       const huongText = item.huong || (areaSuffix === 'vào' ? 'Vào' : (areaSuffix === 'ra' ? 'Ra' : 'Vào'));
-      const cameraText = item.camera_name || item.camera_id || item.vung || '';
+      const cameraText = resolveCameraName(item);
       return {
         'STT': idx + 1,
         'Khu vực': item.vung || '',
@@ -3059,8 +3079,8 @@ export const ReportPage = () => {
                               ({getAreaSuffix(log)})
                             </span>
                           </td>
-                          <td className={`py-2 px-3 border-r border-[#21232d] font-sans ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                            {(log as any).camera_name || (log as any).camera_id || 'Camera 01'}
+                          <td className={`py-2 px-3 border-r border-[#21232d] font-sans ${isSelected ? 'text-[#00a2e8] font-bold' : 'text-slate-300'}`}>
+                            {resolveCameraName(log)}
                           </td>
                           <td className={`py-2 px-3 border-r border-[#21232d] font-sans font-medium ${isSelected ? 'text-white' : 'text-slate-100'}`}>
                             {log.ten}
