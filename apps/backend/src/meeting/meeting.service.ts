@@ -1025,7 +1025,11 @@ export class MeetingService {
     const extractLocalTimeStr = (dateVal: Date | string): string | null => {
       const formatted = this.formatDateToLocalString(dateVal);
       if (!formatted) return null;
-      return formatted.split('-')[1] || null;
+      const parts = formatted.split('-');
+      if (parts.length >= 2) {
+        return `${parts[1]} (${parts[0]})`;
+      }
+      return formatted;
     };
 
     const allEmployeeIds = new Set<string>();
@@ -1224,8 +1228,15 @@ export class MeetingService {
         const entryEvent = dayIn[0] || null;
         const exitEvent = dayOut[0] || null;
 
-        const inStr = entryEvent ? this.formatDateToLocalString(entryEvent.time_created).split('-')[1] : null;
-        const outStr = exitEvent ? this.formatDateToLocalString(exitEvent.time_created).split('-')[1] : null;
+        const formatLocalTimeWithDate = (evt: any) => {
+          if (!evt?.time_created) return null;
+          const formatted = this.formatDateToLocalString(evt.time_created);
+          if (!formatted) return null;
+          const parts = formatted.split('-');
+          return parts.length >= 2 ? `${parts[1]} (${parts[0]})` : formatted;
+        };
+        const inStr = formatLocalTimeWithDate(entryEvent);
+        const outStr = formatLocalTimeWithDate(exitEvent);
         const hours = calcWorkHours(inStr, outStr);
         totalHours += hours;
 

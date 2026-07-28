@@ -112,6 +112,110 @@ const getPhotoSrc = (item: any, type: 'in' | 'out') => {
   return getMeetingPhoto(item.emp.avatarSeed, item.emp.ma === "010203045567", type);
 };
 
+const AttendanceEventImageSlider = ({ event, emp, title }: { event: any; emp?: any; title: string }) => {
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  const slides = useMemo(() => {
+    const faceCamImg = event?.face_image_path
+      ? resolveImageUrl(event.face_image_path)
+      : (event?.faceImgBase64 || event?.cropped_face_images?.[0] || '');
+
+    const fullCamImg = event?.full_image_path
+      ? resolveImageUrl(event.full_image_path)
+      : '';
+
+    const profileImg = emp?.originalObject?.anhDaiDien?.url
+      ? emp.originalObject.anhDaiDien.url
+      : (emp?.avatarSeed ? getMeetingPhoto(emp.avatarSeed, emp.ma === "010203045567", 'in') : '');
+
+    return [
+      { label: 'Khuôn mặt camera', src: faceCamImg, tag: 'FACE CAM' },
+      { label: 'Toàn cảnh camera', src: fullCamImg, tag: 'FULL CAM' },
+      { label: 'Hồ sơ đăng ký', src: profileImg, tag: 'HỒ SƠ' },
+    ];
+  }, [event, emp]);
+
+  const activeSlide = slides[slideIndex] || slides[0];
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSlideIndex((prev) => (prev === 0 ? slides.length - 1 : prev - 1));
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSlideIndex((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{title}</span>
+        <span className="text-[9px] font-mono text-[#00a2e8] bg-[#00a2e8]/10 px-1.5 py-0.5 rounded border border-[#00a2e8]/20 font-bold">
+          {slideIndex + 1}/3 • {activeSlide.label}
+        </span>
+      </div>
+      <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-[#2d2f3c] bg-[#0d0e12] flex items-center justify-center shadow-inner group">
+        {activeSlide.src ? (
+          <>
+            <img
+              src={activeSlide.src}
+              alt={activeSlide.label}
+              className="w-full h-full object-cover"
+            />
+            {slideIndex === 0 && (
+              <div className="absolute inset-2 border border-emerald-500/30 rounded pointer-events-none">
+                <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-emerald-400" />
+                <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-emerald-400" />
+                <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-emerald-400" />
+                <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-emerald-400" />
+              </div>
+            )}
+            <span className="absolute bottom-1 left-1 text-[8px] font-mono bg-black/80 px-1.5 py-0.5 rounded border border-slate-700/50 text-emerald-400 font-bold">
+              {activeSlide.tag}
+            </span>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-1.5 text-slate-500 p-2 text-center">
+            <CameraOff size={24} className="text-slate-600" />
+            <span className="text-[10px] font-mono">Không có {activeSlide.label.toLowerCase()}</span>
+          </div>
+        )}
+
+        {/* Slider Controls */}
+        <button
+          type="button"
+          onClick={handlePrev}
+          className="absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-black/60 hover:bg-black/90 text-white opacity-70 hover:opacity-100 transition z-10"
+          title="Ảnh trước"
+        >
+          <ChevronLeft size={13} />
+        </button>
+        <button
+          type="button"
+          onClick={handleNext}
+          className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-black/60 hover:bg-black/90 text-white opacity-70 hover:opacity-100 transition z-10"
+          title="Ảnh tiếp"
+        >
+          <ChevronRight size={13} />
+        </button>
+
+        {/* Slide Indicator Dots */}
+        <div className="absolute bottom-1 right-1 flex space-x-1 bg-black/70 px-1.5 py-0.5 rounded-full z-10">
+          {slides.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setSlideIndex(idx); }}
+              className={`w-1.5 h-1.5 rounded-full transition-all ${idx === slideIndex ? 'bg-[#00a2e8] w-3' : 'bg-slate-500 hover:bg-slate-300'}`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ReportPage = () => {
   const location = useLocation();
   const { eventLogs, meetings, areasData, employees, isLoadingLogs, humanGroups } = useApp();
@@ -872,8 +976,11 @@ export const ReportPage = () => {
   const calculateWorkHours = useCallback((checkInStr: string, checkOutStr: string): string => {
     if (!checkInStr || checkInStr === 'Trống' || checkInStr === 'Không có dữ liệu' || !checkOutStr || checkOutStr === 'Trống' || checkOutStr === 'Không có dữ liệu') return '0 h';
 
-    const [inH, inM, inS] = checkInStr.split(':').map(Number);
-    const [outH, outM, outS] = checkOutStr.split(':').map(Number);
+    const cleanInStr = checkInStr.trim().split(' ')[0];
+    const cleanOutStr = checkOutStr.trim().split(' ')[0];
+
+    const [inH, inM, inS] = cleanInStr.split(':').map(Number);
+    const [outH, outM, outS] = cleanOutStr.split(':').map(Number);
 
     const inSeconds = inH * 3600 + inM * 60 + (inS || 0);
     const outSeconds = outH * 3600 + outM * 60 + (outS || 0);
@@ -909,8 +1016,11 @@ export const ReportPage = () => {
       return { text: 'Thiếu Check-in', style: 'bg-orange-500/10 text-orange-400 border-orange-500/20' };
     }
 
-    const [inH, inM] = thoiGianVao!.split(':').map(Number);
-    const [outH, outM] = thoiGianRa!.split(':').map(Number);
+    const cleanInStr = thoiGianVao!.trim().split(' ')[0];
+    const cleanOutStr = thoiGianRa!.trim().split(' ')[0];
+
+    const [inH, inM] = cleanInStr.split(':').map(Number);
+    const [outH, outM] = cleanOutStr.split(':').map(Number);
     const [sH, sM] = shiftStart.split(':').map(Number);
     const [eH, eM] = shiftEnd.split(':').map(Number);
 
@@ -3917,74 +4027,18 @@ export const ReportPage = () => {
                                 </div>
 
                                 {/* Entry Photo */}
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ảnh lúc vào</span>
-                                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${activeLog.checkIn === 'Trống' ? 'text-slate-500 bg-slate-500/10 border-slate-500/10' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'}`}>
-                                      {activeLog.checkIn}
-                                    </span>
-                                  </div>
-                                  <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-[#2d2f3c] bg-[#0d0e12] flex items-center justify-center shadow-inner">
-                                    {activeLog.entryEvent?.cropped_face_images?.[0] ? (
-                                      <>
-                                        <img
-                                          src={activeLog.entryEvent.cropped_face_images[0]}
-                                          alt="Check-in"
-                                          className="w-full h-full object-cover"
-                                        />
-                                        <div className="absolute inset-2 border border-emerald-500/30 rounded pointer-events-none">
-                                          <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-emerald-400" />
-                                          <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-emerald-400" />
-                                          <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-emerald-400" />
-                                          <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-emerald-400" />
-                                        </div>
-                                        <span className="absolute bottom-1 left-1 text-[8px] font-mono bg-black/80 px-1 rounded border border-slate-700/50 text-slate-300">
-                                          Ảnh check-in
-                                        </span>
-                                      </>
-                                    ) : (
-                                      <div className="flex flex-col items-center justify-center gap-2 text-slate-600">
-                                        <CameraOff size={28} />
-                                        <span className="text-[10px] font-mono">Không có ảnh</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
+                                <AttendanceEventImageSlider
+                                  title="Ảnh lúc vào"
+                                  event={activeLog.entryEvent}
+                                  emp={selectedWeeklyAttendee}
+                                />
 
                                 {/* Exit Photo */}
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ảnh lúc ra</span>
-                                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${activeLog.checkOut === 'Trống' ? 'text-slate-500 bg-slate-500/10 border-slate-500/10' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'}`}>
-                                      {activeLog.checkOut}
-                                    </span>
-                                  </div>
-                                  <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-[#2d2f3c] bg-[#0d0e12] flex items-center justify-center shadow-inner">
-                                    {activeLog.exitEvent?.cropped_face_images?.[0] ? (
-                                      <>
-                                        <img
-                                          src={activeLog.exitEvent.cropped_face_images[0]}
-                                          alt="Check-out"
-                                          className="w-full h-full object-cover"
-                                        />
-                                        <div className="absolute inset-2 border border-emerald-500/30 rounded pointer-events-none">
-                                          <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-emerald-400" />
-                                          <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-emerald-400" />
-                                          <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-emerald-400" />
-                                          <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-emerald-400" />
-                                        </div>
-                                        <span className="absolute bottom-1 left-1 text-[8px] font-mono bg-black/80 px-1 rounded border border-slate-700/50 text-slate-300">
-                                          Ảnh check-out
-                                        </span>
-                                      </>
-                                    ) : (
-                                      <div className="flex flex-col items-center justify-center gap-2 text-slate-600">
-                                        <CameraOff size={28} />
-                                        <span className="text-[10px] font-mono">Không có ảnh</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
+                                <AttendanceEventImageSlider
+                                  title="Ảnh lúc ra"
+                                  event={activeLog.exitEvent}
+                                  emp={selectedWeeklyAttendee}
+                                />
                               </div>
                             ) : (
                               <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-500 space-y-2">
@@ -4253,74 +4307,18 @@ export const ReportPage = () => {
                           {selectedAttendee ? (
                             <div className="p-4 space-y-4 text-left">
                               {/* Entry Section */}
-                              <div className="space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ảnh lúc vào</span>
-                                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${!selectedAttendee.thoiGianVao || selectedAttendee.thoiGianVao === 'Trống' || selectedAttendee.thoiGianVao === 'Không có dữ liệu' ? 'text-slate-500 bg-slate-500/10 border-slate-500/10' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'}`}>
-                                    {selectedAttendee.thoiGianVao && selectedAttendee.thoiGianVao !== 'Trống' && selectedAttendee.thoiGianVao !== 'Không có dữ liệu' ? selectedAttendee.thoiGianVao : 'Không có dữ liệu'}
-                                  </span>
-                                </div>
-                                <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-[#2d2f3c] bg-[#0d0e12] flex items-center justify-center shadow-inner">
-                                  {selectedAttendee.entryEvent?.cropped_face_images?.[0] ? (
-                                    <>
-                                      <img
-                                        src={selectedAttendee.entryEvent.cropped_face_images[0]}
-                                        alt="Check-in"
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <div className="absolute inset-2 border border-emerald-500/30 rounded pointer-events-none">
-                                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-emerald-400" />
-                                        <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-emerald-400" />
-                                        <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-emerald-400" />
-                                        <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-emerald-400" />
-                                      </div>
-                                      <span className="absolute bottom-1 left-1 text-[8px] font-mono bg-black/80 px-1 rounded border border-slate-700/50 text-slate-300">
-                                        Ảnh check-in
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <div className="flex flex-col items-center justify-center gap-2 text-slate-600">
-                                      <CameraOff size={28} />
-                                      <span className="text-[10px] font-mono">Không có ảnh</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                              <AttendanceEventImageSlider
+                                title="Ảnh lúc vào"
+                                event={selectedAttendee.entryEvent}
+                                emp={selectedAttendee}
+                              />
 
                               {/* Exit Section */}
-                              <div className="space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ảnh lúc ra</span>
-                                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${!selectedAttendee.thoiGianRa || selectedAttendee.thoiGianRa === 'Trống' || selectedAttendee.thoiGianRa === 'Không có dữ liệu' ? 'text-slate-500 bg-slate-500/10 border-slate-500/10' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'}`}>
-                                    {selectedAttendee.thoiGianRa && selectedAttendee.thoiGianRa !== 'Trống' && selectedAttendee.thoiGianRa !== 'Không có dữ liệu' ? selectedAttendee.thoiGianRa : 'Không có dữ liệu'}
-                                  </span>
-                                </div>
-                                <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-[#2d2f3c] bg-[#0d0e12] flex items-center justify-center shadow-inner">
-                                  {selectedAttendee.exitEvent?.cropped_face_images?.[0] ? (
-                                    <>
-                                      <img
-                                        src={selectedAttendee.exitEvent.cropped_face_images[0]}
-                                        alt="Check-out"
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <div className="absolute inset-2 border border-emerald-500/30 rounded pointer-events-none">
-                                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-emerald-400" />
-                                        <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-emerald-400" />
-                                        <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-emerald-400" />
-                                        <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-emerald-400" />
-                                      </div>
-                                      <span className="absolute bottom-1 left-1 text-[8px] font-mono bg-black/80 px-1 rounded border border-slate-700/50 text-slate-300">
-                                        Ảnh check-out
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <div className="flex flex-col items-center justify-center gap-2 text-slate-600">
-                                      <CameraOff size={28} />
-                                      <span className="text-[10px] font-mono">Không có ảnh</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                              <AttendanceEventImageSlider
+                                title="Ảnh lúc ra"
+                                event={selectedAttendee.exitEvent}
+                                emp={selectedAttendee}
+                              />
                             </div>
                           ) : (
                             <div className="flex-1 flex items-center justify-center text-slate-500 text-xs">
