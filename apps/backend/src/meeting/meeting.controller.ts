@@ -27,11 +27,13 @@ export class MeetingController {
     @Query('endTime')   endTime?:   string,
     @Query('group')     group?:     string,
     @Query('eventType') eventType?: string,
-    @Query('noImages')  noImages?:  string,
+    @Query('noImages')      noImages?:      string,
+    @Query('windowSeconds') windowSeconds?: string,
+    @Query('windowMinutes') windowMinutes?: string,
   ) {
     return this.meetingService.getEventLogs({
-      page:      page      ? parseInt(page,  10) : 1,
-      limit:     limit     ? parseInt(limit, 10) : 10,
+      page:          page          ? parseInt(page,          10) : 1,
+      limit:         limit         ? parseInt(limit,         10) : 10,
       search,
       zone,
       startDate,
@@ -40,26 +42,30 @@ export class MeetingController {
       endTime,
       group,
       eventType,
-      noImages:  noImages === 'true',
+      noImages:      noImages === 'true',
+      windowSeconds: windowSeconds ? parseInt(windowSeconds, 10) : undefined,
+      windowMinutes: windowMinutes ? parseInt(windowMinutes, 10) : undefined,
     });
   }
 
   @Get('event-logs/ids')
   async getEventLogIds(
-    @Query('page')      page?:      string,
-    @Query('limit')     limit?:     string,
-    @Query('search')    search?:    string,
-    @Query('zone')      zone?:      string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate')   endDate?:   string,
-    @Query('startTime') startTime?: string,
-    @Query('endTime')   endTime?:   string,
-    @Query('group')     group?:     string,
-    @Query('eventType') eventType?: string,
+    @Query('page')          page?:          string,
+    @Query('limit')         limit?:         string,
+    @Query('search')        search?:        string,
+    @Query('zone')          zone?:          string,
+    @Query('startDate')     startDate?:     string,
+    @Query('endDate')       endDate?:       string,
+    @Query('startTime')     startTime?:     string,
+    @Query('endTime')       endTime?:       string,
+    @Query('group')         group?:         string,
+    @Query('eventType')     eventType?:     string,
+    @Query('windowSeconds') windowSeconds?: string,
+    @Query('windowMinutes') windowMinutes?: string,
   ) {
     return this.meetingService.getEventLogIds({
-      page:      page      ? parseInt(page,  10) : 1,
-      limit:     limit     ? parseInt(limit, 10) : 10,
+      page:          page          ? parseInt(page,          10) : 1,
+      limit:         limit         ? parseInt(limit,         10) : 10,
       search,
       zone,
       startDate,
@@ -68,6 +74,8 @@ export class MeetingController {
       endTime,
       group,
       eventType,
+      windowSeconds: windowSeconds ? parseInt(windowSeconds, 10) : undefined,
+      windowMinutes: windowMinutes ? parseInt(windowMinutes, 10) : undefined,
     });
   }
 

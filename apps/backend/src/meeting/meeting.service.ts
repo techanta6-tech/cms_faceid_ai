@@ -632,11 +632,63 @@ export class MeetingService {
     };
   }
 
+  private deduplicateEvents<T extends { object_id?: string; document_id?: string; camera_event_id?: string; area_name?: string; time_created: Date | string }>(
+    events: T[],
+    locationNameByCameraId: Map<string, string>,
+    windowMs: number = 30 * 1000
+  ): T[] {
+    if (!events || events.length === 0) return [];
+
+    // Arrange events chronologically ascending for deduplication clustering
+    const sorted = [...events].sort(
+      (a, b) => new Date(a.time_created).getTime() - new Date(b.time_created).getTime()
+    );
+
+    const keyMap = new Map<string, { latestEvt: T; lastSeenTime: number }>();
+    const result: T[] = [];
+
+    for (const evt of sorted) {
+      const ma = evt.document_id || evt.object_id || '';
+      const areaName = evt.camera_event_id ? locationNameByCameraId.get(evt.camera_event_id) : undefined;
+      const vung = areaName || evt.area_name || 'Không xác định';
+      const key = `${ma}_${vung}`;
+
+      const evtTime = new Date(evt.time_created).getTime();
+      const entry = keyMap.get(key);
+
+      if (entry) {
+        const diff = evtTime - entry.lastSeenTime;
+        if (diff <= windowMs) {
+          // Event occurs within window threshold of previous event in cluster -> update cluster latest event
+          entry.latestEvt = evt;
+          entry.lastSeenTime = evtTime;
+        } else {
+          // Gap exceeded window threshold -> finalize previous cluster and start new cluster
+          result.push(entry.latestEvt);
+          keyMap.set(key, { latestEvt: evt, lastSeenTime: evtTime });
+        }
+      } else {
+        keyMap.set(key, { latestEvt: evt, lastSeenTime: evtTime });
+      }
+    }
+
+    for (const entry of keyMap.values()) {
+      result.push(entry.latestEvt);
+    }
+
+    // Sort final deduplicated list descending by create_time (newest first)
+    return result.sort(
+      (a, b) => new Date(b.time_created).getTime() - new Date(a.time_created).getTime()
+    );
+  }
+
   async getEventLogs(opts: {
     page?: number; limit?: number; search?: string; zone?: string;
     startDate?: string; endDate?: string; startTime?: string; endTime?: string;
     group?: string; eventType?: string;
     noImages?: boolean;
+    windowSeconds?: number;
+    windowMinutes?: number;
   } = {}) {
     console.log(`[DEBUG Backend] Bắt đầu truy vấn getEventLogs với các tham số:`, opts);
     const page   = Math.max(1, opts.page   || 1);
@@ -659,15 +711,7 @@ export class MeetingService {
 
     const where = this.buildEventConditions(opts, cameraIds);
 
-    const countQuery = `
-      SELECT COUNT(*) AS total
-      FROM event_vms_parent ev
-      INNER JOIN event_statistic_parent es ON ev.source_id = es.id
-      INNER JOIN human_info h             ON es.object_id = h.id
-      LEFT  JOIN camera_area_event_source ca ON es.source_id = ca.area_id
-      WHERE ${where};
-    `;
-    const dataQuery = `
+    const rawQuery = `
       SELECT
           ev.id AS event_id,
           es.object_id,
@@ -678,29 +722,60 @@ export class MeetingService {
           h.list_ids,
           ca.camera_friendly_name AS camera_name,
           ca.area_name
-          ${opts.noImages ? '' : `, h.cropped_face_images, ei_full.image_path AS full_image_path, ei_face.image_path AS face_image_path`}
       FROM event_vms_parent ev
       INNER JOIN event_statistic_parent es ON ev.source_id = es.id
       INNER JOIN human_info h             ON es.object_id = h.id
       LEFT  JOIN camera_area_event_source ca ON es.source_id = ca.area_id
-      ${opts.noImages ? '' : `
-      LEFT  JOIN event_image_parent ei_full  ON ev.source_id = ei_full.statistic_id AND ei_full.type = 1
-      LEFT  JOIN event_image_parent ei_face  ON ev.source_id = ei_face.statistic_id AND ei_face.type = 4
-      `}
       WHERE ${where}
-      ORDER BY ev.create_time DESC
-      ${parsedLimit === -1 ? '' : `LIMIT ${limit} OFFSET ${offset}`};
+      ORDER BY ev.create_time DESC;
     `;
 
     try {
-      const [countRows, rawEvents] = await Promise.all([
-        this.lcms.$queryRawUnsafe<any[]>(countQuery),
-        this.lcms.$queryRawUnsafe<any[]>(dataQuery),
-      ]);
+      const rawEvents = await this.lcms.$queryRawUnsafe<any[]>(rawQuery);
       console.log(`[DEBUG Backend] Thực thi SQL thành công. Số lượng bản ghi thô (raw): ${rawEvents.length}`);
 
-      const total = parseInt(countRows[0]?.total ?? '0', 10);
-      const data  = rawEvents.map((e, idx) => this.mapRawEvent(e, idx, listMap, locationNameByCameraId, offset));
+      let windowMs = 30 * 1000; // default 30 seconds
+      if (opts.windowMinutes !== undefined) {
+        windowMs = opts.windowMinutes * 60 * 1000;
+      } else if (opts.windowSeconds !== undefined) {
+        windowMs = opts.windowSeconds * 1000;
+      }
+
+      const dedupedEvents = this.deduplicateEvents(rawEvents, locationNameByCameraId, windowMs);
+      const total = dedupedEvents.length;
+      const paginatedEvents = dedupedEvents.slice(offset, offset + limit);
+
+      let eventsWithImages = paginatedEvents;
+      if (!opts.noImages && paginatedEvents.length > 0) {
+        const paginatedIds = paginatedEvents.map(e => `'${e.event_id.replace(/'/g, "''")}'`).join(', ');
+        const imagesQuery = `
+          SELECT
+              ev.id AS event_id,
+              h.cropped_face_images,
+              ei_full.image_path AS full_image_path,
+              ei_face.image_path AS face_image_path
+          FROM event_vms_parent ev
+          INNER JOIN event_statistic_parent es ON ev.source_id = es.id
+          INNER JOIN human_info h             ON es.object_id = h.id
+          LEFT  JOIN event_image_parent ei_full  ON ev.source_id = ei_full.statistic_id AND ei_full.type = 1
+          LEFT  JOIN event_image_parent ei_face  ON ev.source_id = ei_face.statistic_id AND ei_face.type = 4
+          WHERE ev.id IN (${paginatedIds});
+        `;
+        const imageRows = await this.lcms.$queryRawUnsafe<any[]>(imagesQuery);
+        const imageMap = new Map<string, any>(imageRows.map(r => [r.event_id, r]));
+
+        eventsWithImages = paginatedEvents.map(e => {
+          const imgData = imageMap.get(e.event_id);
+          return {
+            ...e,
+            cropped_face_images: imgData?.cropped_face_images,
+            full_image_path: imgData?.full_image_path,
+            face_image_path: imgData?.face_image_path,
+          };
+        });
+      }
+
+      const data = eventsWithImages.map((e, idx) => this.mapRawEvent(e, idx, listMap, locationNameByCameraId, offset));
       console.log(`[DEBUG Backend] Map dữ liệu thành công. Tổng số bản ghi (total): ${total}, Số bản ghi trả về trang này: ${data.length}`);
 
       return { data, total, page, limit };
@@ -714,6 +789,8 @@ export class MeetingService {
     page?: number; limit?: number; search?: string; zone?: string;
     startDate?: string; endDate?: string; startTime?: string; endTime?: string;
     group?: string; eventType?: string;
+    windowSeconds?: number;
+    windowMinutes?: number;
   } = {}) {
     const page   = Math.max(1, opts.page   || 1);
     const limit  = Math.min(500, Math.max(1, opts.limit || 10));
@@ -730,19 +807,35 @@ export class MeetingService {
         .filter(Boolean);
     }
 
+    const { locationNameByCameraId } = await this.buildLookupMaps();
     const where = this.buildEventConditions(opts, cameraIds);
     const query = `
-      SELECT ev.id AS event_id
+      SELECT
+          ev.id AS event_id,
+          es.object_id,
+          es.camera_event_id,
+          ev.create_time AS time_created,
+          h.document_id,
+          ca.area_name
       FROM event_vms_parent ev
       INNER JOIN event_statistic_parent es ON ev.source_id = es.id
       INNER JOIN human_info h             ON es.object_id = h.id
       LEFT  JOIN camera_area_event_source ca ON es.source_id = ca.area_id
       WHERE ${where}
-      ORDER BY ev.create_time DESC
-      LIMIT ${limit} OFFSET ${offset};
+      ORDER BY ev.create_time DESC;
     `;
     const rows = await this.lcms.$queryRawUnsafe<any[]>(query);
-    return rows.map(r => r.event_id);
+
+    let windowMs = 30 * 1000;
+    if (opts.windowMinutes !== undefined) {
+      windowMs = opts.windowMinutes * 60 * 1000;
+    } else if (opts.windowSeconds !== undefined) {
+      windowMs = opts.windowSeconds * 1000;
+    }
+
+    const deduped = this.deduplicateEvents(rows, locationNameByCameraId, windowMs);
+    const paginated = deduped.slice(offset, offset + limit);
+    return paginated.map(r => r.event_id);
   }
 
   async exportExcel(data: any[], res: any) {
