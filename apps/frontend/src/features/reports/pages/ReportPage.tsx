@@ -1018,6 +1018,16 @@ export const ReportPage = () => {
     return `${Math.round(hours * 100) / 100} h`;
   }, []);
 
+  // Attendance Priority Rank helper (1: Both IN & OUT, 2: 1 of IN/OUT, 3: Neither)
+  const getAttendancePriorityRank = useCallback((thoiGianVao?: string, thoiGianRa?: string) => {
+    const hasIn = thoiGianVao && thoiGianVao !== 'Trống' && thoiGianVao !== 'Không có dữ liệu';
+    const hasOut = thoiGianRa && thoiGianRa !== 'Trống' && thoiGianRa !== 'Không có dữ liệu';
+
+    if (hasIn && hasOut) return 1;
+    if (hasIn || hasOut) return 2;
+    return 3;
+  }, []);
+
   // Dynamic Attendance Status Badge helper
   const getAttendanceStatusBadge = useCallback((thoiGianVao?: string, thoiGianRa?: string, shiftStart = '07:30', shiftEnd = '17:00') => {
     const hasIn = thoiGianVao && thoiGianVao !== 'Trống' && thoiGianVao !== 'Không có dữ liệu';
@@ -2471,8 +2481,8 @@ export const ReportPage = () => {
               'Mã NV': item.ma || 'Không có dữ liệu',
               'Họ và Tên': item.ten || 'Không có dữ liệu',
               'Nhóm / nhóm nhân viên': item.danhSach || 'Không có dữ liệu',
-              'Giờ Vào': (item.thoiGianVao && item.thoiGianVao !== 'Trống' && item.thoiGianVao !== 'Không có dữ liệu') ? item.thoiGianVao : 'Không có dữ liệu',
-              'Giờ Ra': (item.thoiGianRa && item.thoiGianRa !== 'Trống' && item.thoiGianRa !== 'Không có dữ liệu') ? item.thoiGianRa : 'Không có dữ liệu',
+              'Giờ Vào': (item.thoiGianVao && item.thoiGianVao !== 'Trống' && item.thoiGianVao !== 'Không có dữ liệu') ? formatTimeOnly(item.thoiGianVao) : 'Không có dữ liệu',
+              'Giờ Ra': (item.thoiGianRa && item.thoiGianRa !== 'Trống' && item.thoiGianRa !== 'Không có dữ liệu') ? formatTimeOnly(item.thoiGianRa) : 'Không có dữ liệu',
               'Tổng giờ': item.totalHours || '0 h',
               'Trạng thái': item.status?.text || '-',
             };
@@ -3433,7 +3443,7 @@ export const ReportPage = () => {
               { in: '07:30:00', out: '19:15:00' }, // TC10 - Tăng ca OT
             ];
 
-            return activeRealEmployees.map((emp: any, index: number) => {
+            const roster = activeRealEmployees.map((emp: any, index: number) => {
               const match = dailyReportData.find((item: any) => item.employeeId === emp.id);
               let thoiGianVao = match ? ((match.thoiGianVao && match.thoiGianVao !== 'Trống') ? match.thoiGianVao : 'Không có dữ liệu') : 'Không có dữ liệu';
               let thoiGianRa = match ? ((match.thoiGianRa && match.thoiGianRa !== 'Trống') ? match.thoiGianRa : 'Không có dữ liệu') : 'Không có dữ liệu';
@@ -3461,6 +3471,10 @@ export const ReportPage = () => {
                 status,
                 totalHours: calculateWorkHours(thoiGianVao, thoiGianRa),
               };
+            });
+
+            return roster.sort((a, b) => {
+              return getAttendancePriorityRank(a.thoiGianVao, a.thoiGianRa) - getAttendancePriorityRank(b.thoiGianVao, b.thoiGianRa);
             });
           })();
 
