@@ -673,6 +673,8 @@ export class MeetingService {
     if (!cameraName || isUUID(cameraName)) {
       cameraName = vmsCamName || e.camera_event_id || 'Camera 01';
     }
+    const areaName = e.camera_event_id ? locationNameByCameraId.get(e.camera_event_id) : undefined;
+    const displayArea = areaName || e.area_name || 'Không xác định';
     let huong = 'Vào';
     if (displayArea.toLowerCase().includes('checkout') || (cameraName && cameraName.toLowerCase().includes('checkout'))) {
       huong = 'Ra';
