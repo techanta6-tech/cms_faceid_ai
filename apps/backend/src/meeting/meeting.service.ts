@@ -1042,52 +1042,17 @@ export class MeetingService {
         (a, b) => new Date(a.time_created).getTime() - new Date(b.time_created).getTime()
       );
 
-      // Entry Event logic
-      const nearestBeforeStart = allEmpEvents.filter(e => new Date(e.time_created).getTime() < tStartMs).pop();
-      let entryEvent: any = null;
-      if (nearestBeforeStart) {
-        if (nearestBeforeStart.type === 'out') {
-          const firstInDuringMeeting = allEmpEvents.find(
-            e => new Date(e.time_created).getTime() >= tStartMs && 
-                 new Date(e.time_created).getTime() <= tEndMs && 
-                 e.type === 'in'
-          );
-          entryEvent = firstInDuringMeeting || null;
-        } else {
-          entryEvent = nearestBeforeStart;
-        }
-      } else {
-        const firstInDuringMeeting = allEmpEvents.find(
-          e => new Date(e.time_created).getTime() >= tStartMs && 
-               new Date(e.time_created).getTime() <= tEndMs && 
-               e.type === 'in'
-        );
-        entryEvent = firstInDuringMeeting || null;
-      }
+      // Entry Event logic (First check-in in buffer window)
+      const empInSorted = [...empCheckin].sort(
+        (a, b) => new Date(a.time_created).getTime() - new Date(b.time_created).getTime()
+      );
+      const entryEvent = empInSorted[0] || null;
 
-      // Exit Event logic
-      const nearestBeforeEnd = allEmpEvents.filter(
-        e => new Date(e.time_created).getTime() >= tStartMs && 
-             new Date(e.time_created).getTime() <= tEndMs
-      ).pop();
-      let exitEvent: any = null;
-      if (nearestBeforeEnd) {
-        if (nearestBeforeEnd.type === 'out') {
-          exitEvent = nearestBeforeEnd;
-        } else {
-          const firstOutAfterEnd = allEmpEvents.find(
-            e => new Date(e.time_created).getTime() > tEndMs && 
-                 e.type === 'out'
-          );
-          exitEvent = firstOutAfterEnd || null;
-        }
-      } else {
-        const firstOutAfterEnd = allEmpEvents.find(
-          e => new Date(e.time_created).getTime() > tEndMs && 
-               e.type === 'out'
-        );
-        exitEvent = firstOutAfterEnd || null;
-      }
+      // Exit Event logic (Last check-out in buffer window)
+      const empOutSorted = [...empCheckout].sort(
+        (a, b) => new Date(b.time_created).getTime() - new Date(a.time_created).getTime()
+      );
+      const exitEvent = empOutSorted[0] || null;
 
       const empName = empCheckin[0]?.full_name || empCheckout[0]?.full_name || '';
       const empDocId = empCheckin[0]?.document_id || empCheckout[0]?.document_id || '';
