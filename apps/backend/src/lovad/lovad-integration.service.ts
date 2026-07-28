@@ -249,8 +249,9 @@ export class LovadIntegrationService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`DVMS Session established. ConnectionToken: ${this.connectionToken}`);
       return true;
     } catch (error) {
-      this.lastError = `Auth Error: ${error.message}`;
-      this.logger.error(`Authentication & Session setup failed: ${error.message}`);
+      const causeStr = JSON.stringify(error.cause || error);
+      this.lastError = `Auth Error: ${error.message} | Cause: ${causeStr}`;
+      this.logger.error(`Authentication & Session setup failed: ${error.message} | Cause: ${causeStr}`);
       return false;
     }
   }
