@@ -2376,13 +2376,13 @@ export const ReportPage = () => {
     }
 
     infoSheet['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
+      { s: { r: 0, c: 0 }, e: { r: 0, c: range.e.c } },
     ];
 
     infoSheet['!autofilter'] = {
       ref: XLSX.utils.encode_range({
         s: { r: 5, c: 0 },
-        e: { r: range.e.r, c: 6 }
+        e: { r: range.e.r, c: range.e.c }
       })
     };
 
