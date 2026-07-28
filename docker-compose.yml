@@ -26,7 +26,7 @@ services:
     image: cms_faceid-backend:latest
     container_name: cms_faceid-backend
     expose:
-      - "3000"
+      - "3001"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     env_file:

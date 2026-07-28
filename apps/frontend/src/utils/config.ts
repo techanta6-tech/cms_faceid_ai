@@ -6,5 +6,5 @@ export const getBackendUrl = (): string => {
     return `http://${hostname}:8082`;
   }
   
-  return envUrl || 'http://localhost:3001';
+  return envUrl || 'http://localhost:8082';
 };

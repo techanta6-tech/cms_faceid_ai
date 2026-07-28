@@ -45,7 +45,7 @@ COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
 COPY --from=builder /app/apps/backend/run-prisma.js ./apps/backend/run-prisma.js
 
 # Expose backend port
-EXPOSE 3000
+EXPOSE 3001
 
 # Start NestJS backend in production mode
 CMD ["sh", "-c", "until nc -z postgres-db 5432; do echo 'Waiting for database...'; sleep 1; done && yarn workspace backend prisma:push && yarn workspace backend start:prod"]
