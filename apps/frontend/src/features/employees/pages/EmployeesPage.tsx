@@ -475,23 +475,56 @@ export const EmployeesPage = () => {
                                 </>
                               )}
                             </div>
-                            {/* <button
-                              onClick={() => {
-                                if (confirm(`Bạn có chắc chắn muốn xóa nhân sự "${emp.hoTen}" khỏi hệ thống không?`)) {
-                                  setEmployees(employees.filter(e => e.id !== emp.id));
-                                }
-                              }}
-                              className="p-1.5 hover:bg-red-500/10 text-slate-500 hover:text-red-400 rounded-lg transition cursor-pointer"
-                              title="Xóa nhân sự"
+
+                            <span className="text-xs text-slate-400 font-mono">
+                              Hiển thị <span className="text-white font-semibold">{totalEmpItems > 0 ? startIndex + 1 : 0}</span>-
+                              <span className="text-white font-semibold">{Math.min(startIndex + empItemsPerPage, totalEmpItems)}</span> / <span className="text-white font-semibold">{totalEmpItems}</span>
+                            </span>
+                          </div>
+
+                          {/* Right: Page navigation */}
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => setEmpCurrentPage(1)}
+                              disabled={activeEmpPage <= 1}
+                              className="p-1.5 rounded hover:bg-[#1f202b] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                              title="Trang đầu"
                             >
-                              <X size={15} />
-                            </button> */}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                              <ChevronsLeft size={14} />
+                            </button>
+                            <button
+                              onClick={() => setEmpCurrentPage(prev => Math.max(1, prev - 1))}
+                              disabled={activeEmpPage <= 1}
+                              className="p-1.5 rounded hover:bg-[#1f202b] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                              title="Trang trước"
+                            >
+                              <ChevronLeft size={14} />
+                            </button>
+                            <span className="px-3 py-1 text-xs text-slate-300 font-mono">
+                              Trang <span className="text-[#00a2e8] font-bold">{activeEmpPage}</span> / {totalEmpPages}
+                            </span>
+                            <button
+                              onClick={() => setEmpCurrentPage(prev => Math.min(totalEmpPages, prev + 1))}
+                              disabled={activeEmpPage >= totalEmpPages}
+                              className="p-1.5 rounded hover:bg-[#1f202b] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                              title="Trang sau"
+                            >
+                              <ChevronRight size={14} />
+                            </button>
+                            <button
+                              onClick={() => setEmpCurrentPage(totalEmpPages)}
+                              disabled={activeEmpPage >= totalEmpPages}
+                              className="p-1.5 rounded hover:bg-[#1f202b] text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                              title="Trang cuối"
+                            >
+                              <ChevronsRight size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </>
               )}
             </div>
           </div>
@@ -978,7 +1011,7 @@ export const EmployeesPage = () => {
             </div>
 
             {/* Right Panel: nhóm nhân viên builder */}
-            {/* <div className="md:col-span-5 bg-[#14151b] border border-[#21232d] rounded-2xl p-5 shadow-xl relative min-h-[220px] overflow-hidden">
+            <div className="md:col-span-5 bg-[#14151b] border border-[#21232d] rounded-2xl p-5 shadow-xl relative min-h-[220px] overflow-hidden">
               <div className={`transition-all duration-300 ${!showAddGroupDemo ? 'blur-sm pointer-events-none select-none' : ''}`}>
                 <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-5 pb-2 border-b border-slate-800/60 flex items-center space-x-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#00a2e8]" />
@@ -1041,7 +1074,7 @@ export const EmployeesPage = () => {
                   </div>
                 </div>
               )}
-            </div> */}
+            </div>
 
           </div>
         )}

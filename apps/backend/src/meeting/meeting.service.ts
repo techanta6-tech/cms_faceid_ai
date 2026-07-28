@@ -303,7 +303,7 @@ export class MeetingService {
           AND ev.create_time <= $2::timestamp
           AND es.camera_event_id = ANY($3::varchar[])
           AND h.list_ids && $4::varchar[]
-          AND LOWER(ca.area_name) = 'diem danh'
+          AND (ca.area_name ILIKE '%diem danh%' OR ca.area_name ILIKE '%điểm danh%')
           AND ev.is_valid = true 
           AND ev.is_deleted = false
       ORDER BY ev.create_time DESC;
@@ -563,6 +563,8 @@ export class MeetingService {
     if (opts.zone && opts.zone !== 'All') {
       const z = opts.zone.replace(/'/g, "''");
       parts.push(`(ca.area_name ILIKE '%${z}%')`);
+    } else {
+      parts.push(`(ca.area_name ILIKE '%diem danh%' OR ca.area_name ILIKE '%điểm danh%')`);
     }
     if (opts.group && opts.group !== 'All') {
       const g = opts.group.replace(/'/g, "''");
@@ -759,6 +761,14 @@ export class MeetingService {
     }));
 
     const ws = XLSX.utils.json_to_sheet(formattedRows);
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:G100');
+    ws['!autofilter'] = {
+      ref: XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: range.e.r, c: range.e.c }
+      })
+    };
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'DanhSachSuKien');
 
@@ -860,6 +870,7 @@ export class MeetingService {
           AND ev.create_time <= $2::timestamp
           AND es.camera_event_id = ANY($3::varchar[])
           ${groupFilterSql}
+          AND (ca.area_name ILIKE '%diem danh%' OR ca.area_name ILIKE '%điểm danh%')
           AND ev.is_valid = true 
           AND ev.is_deleted = false
       ORDER BY ev.create_time ASC;
@@ -1064,12 +1075,14 @@ export class MeetingService {
       FROM event_vms_parent ev
       INNER JOIN event_statistic_parent es ON ev.source_id = es.id
       INNER JOIN human_info h ON es.object_id = h.id
+      LEFT JOIN camera_area_event_source ca ON es.source_id = ca.area_id
       LEFT JOIN event_image_parent ei_face ON ev.source_id = ei_face.statistic_id AND ei_face.type = 4
       WHERE
           ev.create_time >= $1::timestamp
           AND ev.create_time <= $2::timestamp
           AND es.camera_event_id = ANY($3::varchar[])
           ${groupFilterSql}
+          AND (ca.area_name ILIKE '%diem danh%' OR ca.area_name ILIKE '%điểm danh%')
           AND ev.is_valid = true
           AND ev.is_deleted = false
       ORDER BY ev.create_time ASC;
