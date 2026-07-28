@@ -982,6 +982,13 @@ export const ReportPage = () => {
     }
   }, [areasData, prevAttendanceAreasKey]);
 
+  // Helper to extract time only (HH:mm:ss or HH:mm) from datetime string
+  const formatTimeOnly = useCallback((timeStr: string): string => {
+    if (!timeStr || timeStr === 'Trống' || timeStr === 'Không có dữ liệu') return timeStr;
+    const timeMatch = timeStr.match(/\b([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?\b/);
+    return timeMatch ? timeMatch[0] : timeStr;
+  }, []);
+
   // Dynamic Work Hours calculation helper
   const calculateWorkHours = useCallback((checkInStr: string, checkOutStr: string): string => {
     if (!checkInStr || checkInStr === 'Trống' || checkInStr === 'Không có dữ liệu' || !checkOutStr || checkOutStr === 'Trống' || checkOutStr === 'Không có dữ liệu') return '0 h';
@@ -3844,8 +3851,8 @@ export const ReportPage = () => {
                             type="button"
                             onClick={() => setIsExpandShiftOpen(!isExpandShiftOpen)}
                             className={`h-full px-3 border rounded-xl flex items-center space-x-1.5 text-xs font-semibold transition-all cursor-pointer ${isExpandShiftOpen
-                                ? 'bg-[#00a2e8]/15 text-[#00a2e8] border-[#00a2e8]'
-                                : 'bg-[#1c1d26] text-slate-300 border-[#2d2f3c] hover:bg-[#252735] hover:text-white'
+                              ? 'bg-[#00a2e8]/15 text-[#00a2e8] border-[#00a2e8]'
+                              : 'bg-[#1c1d26] text-slate-300 border-[#2d2f3c] hover:bg-[#252735] hover:text-white'
                               }`}
                             title="Tùy chỉnh giờ ca làm & mở/đóng cổng"
                           >
@@ -4052,10 +4059,10 @@ export const ReportPage = () => {
                                         {log.dayName} <span className="text-[10px] text-slate-500 font-mono ml-1">({log.dateStr.split('-').reverse().slice(0, 2).join('/')})</span>
                                       </td>
                                       <td className={`py-3 px-4 ${hasNoLog ? 'text-slate-500' : 'text-slate-300'}`}>
-                                        {log.checkIn}
+                                        {formatTimeOnly(log.checkIn)}
                                       </td>
                                       <td className={`py-3 px-4 ${hasNoLog ? 'text-slate-500' : 'text-slate-300'}`}>
-                                        {log.checkOut}
+                                        {formatTimeOnly(log.checkOut)}
                                       </td>
                                       <td className={`py-3 px-4 text-center font-semibold ${hasNoLog ? 'text-slate-500' : 'text-emerald-400'}`}>
                                         {log.totalHours}
@@ -4140,7 +4147,7 @@ export const ReportPage = () => {
                         } else if (isRange) {
                           activeCount = rangeReportData.length;
                         }
-                        return (
+                                                return (
                           <div className="text-[11px] font-mono text-slate-400">
                             Phát hiện: <span className="text-white font-bold font-mono">{activeCount}</span> nhân sự
                           </div>
@@ -4170,7 +4177,6 @@ export const ReportPage = () => {
                                   </thead>
                                   <tbody className="divide-y divide-[#1b1c24] text-xs font-mono">
                                     {paginatedActiveEmployees.map((emp, idx) => {
-                                      const isPhuc = emp.ma === "080203011585";
                                       const isSelected = selectedAttendee && selectedAttendee.ma === emp.ma;
                                       const stt = (attendanceCurrentPage - 1) * attendanceItemsPerPage + idx + 1;
                                       return (
@@ -4193,8 +4199,8 @@ export const ReportPage = () => {
                                           <td className="py-2.5 px-4 text-amber-500 font-bold">{emp.ma}</td>
                                           <td className={`py-2.5 px-4 font-sans font-medium ${(isSelected && !isWeeklyOrMonthly) ? 'text-[#00a2e8]' : 'text-slate-100'}`}>{emp.ten}</td>
                                           <td className="py-2.5 px-4 font-sans">{emp.danhSach}</td>
-                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianVao && emp.thoiGianVao !== 'Trống' && emp.thoiGianVao !== 'Không có dữ liệu' ? emp.thoiGianVao : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
-                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianRa && emp.thoiGianRa !== 'Trống' && emp.thoiGianRa !== 'Không có dữ liệu' ? emp.thoiGianRa : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
+                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianVao && emp.thoiGianVao !== 'Trống' && emp.thoiGianVao !== 'Không có dữ liệu' ? formatTimeOnly(emp.thoiGianVao) : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
+                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianRa && emp.thoiGianRa !== 'Trống' && emp.thoiGianRa !== 'Không có dữ liệu' ? formatTimeOnly(emp.thoiGianRa) : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
                                           <td className="py-2.5 px-4 text-white font-bold">{emp.totalHours || '0 h'}</td>
                                           {!isWeeklyOrMonthly && (
                                             <td className="py-2.5 px-4 text-center">
@@ -5912,56 +5918,56 @@ export const ReportPage = () => {
                             exit={{ opacity: 0, y: 5 }}
                             className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 p-2 space-y-1"
                           >
-                          <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
-                            <button
-                              type="button"
-                              onClick={() => setFilterZones(areasData.map(a => a.name))}
-                              className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
-                            >
-                              Chọn tất cả
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFilterZones([]);
-                                setFilterCameras([]);
-                              }}
-                              className="text-[10px] text-slate-400 hover:underline font-semibold"
-                            >
-                              Bỏ chọn
-                            </button>
-                          </div>
-                          <div className="max-h-40 overflow-y-auto space-y-1">
-                            {areasData.map((area) => {
-                              const zoneName = area.name;
-                              const isChecked = filterZones.includes(zoneName);
-                              return (
-                                <button
-                                  key={area.id}
-                                  type="button"
-                                  onClick={() => {
-                                    if (isChecked) {
-                                      const next = filterZones.filter(z => z !== zoneName);
-                                      setFilterZones(next);
-                                      if (next.length === 0) setFilterCameras([]);
-                                    } else {
-                                      setFilterZones([...filterZones, zoneName]);
-                                    }
-                                  }}
-                                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-slate-200 hover:bg-[#20212a] transition cursor-pointer"
-                                >
-                                  <span className="truncate mr-2">{zoneName}</span>
-                                  <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked
-                                    ? 'border-[#00a2e8] bg-[#00a2e8]'
-                                    : 'border-[#2d2f3c] bg-[#111218]'
-                                    }`}>
-                                    {isChecked && <Check size={10} className="text-white font-bold" />}
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </motion.div>
+                            <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
+                              <button
+                                type="button"
+                                onClick={() => setFilterZones(areasData.map(a => a.name))}
+                                className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
+                              >
+                                Chọn tất cả
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFilterZones([]);
+                                  setFilterCameras([]);
+                                }}
+                                className="text-[10px] text-slate-400 hover:underline font-semibold"
+                              >
+                                Bỏ chọn
+                              </button>
+                            </div>
+                            <div className="max-h-40 overflow-y-auto space-y-1">
+                              {areasData.map((area) => {
+                                const zoneName = area.name;
+                                const isChecked = filterZones.includes(zoneName);
+                                return (
+                                  <button
+                                    key={area.id}
+                                    type="button"
+                                    onClick={() => {
+                                      if (isChecked) {
+                                        const next = filterZones.filter(z => z !== zoneName);
+                                        setFilterZones(next);
+                                        if (next.length === 0) setFilterCameras([]);
+                                      } else {
+                                        setFilterZones([...filterZones, zoneName]);
+                                      }
+                                    }}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-slate-200 hover:bg-[#20212a] transition cursor-pointer"
+                                  >
+                                    <span className="truncate mr-2">{zoneName}</span>
+                                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked
+                                      ? 'border-[#00a2e8] bg-[#00a2e8]'
+                                      : 'border-[#2d2f3c] bg-[#111218]'
+                                      }`}>
+                                      {isChecked && <Check size={10} className="text-white font-bold" />}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </motion.div>
                         </>
                       )}
                     </AnimatePresence>
@@ -5993,7 +5999,7 @@ export const ReportPage = () => {
                                   if (filterCameras.length === availableCameras.length) return `Tất cả (${availableCameras.length} Cam)`;
                                   return availableCameras
                                     .filter(c => filterCameras.includes(c.camera_id))
-                                    .map(c => c.camera_name || c.name || c.camera_id)
+                                    .map(c => c.camera_name || c.camera_id)
                                     .join(', ');
                                 })()}
                               </span>
@@ -6010,52 +6016,52 @@ export const ReportPage = () => {
                                     exit={{ opacity: 0, y: 5 }}
                                     className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 p-2 space-y-1"
                                   >
-                                  <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => setFilterCameras(availableCameras.map(c => c.camera_id))}
-                                      className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
-                                    >
-                                      Chọn tất cả
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setFilterCameras([])}
-                                      className="text-[10px] text-slate-400 hover:underline font-semibold"
-                                    >
-                                      Bỏ chọn
-                                    </button>
-                                  </div>
-                                  <div className="max-h-40 overflow-y-auto space-y-1">
-                                    {availableCameras.map((cam) => {
-                                      const camId = cam.camera_id;
-                                      const camName = cam.camera_name || cam.name || camId;
-                                      const isChecked = filterCameras.includes(camId);
-                                      return (
-                                        <button
-                                          key={cam.id || camId}
-                                          type="button"
-                                          onClick={() => {
-                                            if (isChecked) {
-                                              setFilterCameras(filterCameras.filter(c => c !== camId));
-                                            } else {
-                                              setFilterCameras([...filterCameras, camId]);
-                                            }
-                                          }}
-                                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-slate-200 hover:bg-[#20212a] transition cursor-pointer"
-                                        >
-                                          <span className="truncate mr-2">{camName}</span>
-                                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked
-                                            ? 'border-[#00a2e8] bg-[#00a2e8]'
-                                            : 'border-[#2d2f3c] bg-[#111218]'
-                                            }`}>
-                                            {isChecked && <Check size={10} className="text-white font-bold" />}
-                                          </div>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </motion.div>
+                                    <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setFilterCameras(availableCameras.map(c => c.camera_id))}
+                                        className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
+                                      >
+                                        Chọn tất cả
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setFilterCameras([])}
+                                        className="text-[10px] text-slate-400 hover:underline font-semibold"
+                                      >
+                                        Bỏ chọn
+                                      </button>
+                                    </div>
+                                    <div className="max-h-40 overflow-y-auto space-y-1">
+                                      {availableCameras.map((cam) => {
+                                        const camId = cam.camera_id;
+                                        const camName = cam.camera_name || camId;
+                                        const isChecked = filterCameras.includes(camId);
+                                        return (
+                                          <button
+                                            key={cam.id || camId}
+                                            type="button"
+                                            onClick={() => {
+                                              if (isChecked) {
+                                                setFilterCameras(filterCameras.filter(c => c !== camId));
+                                              } else {
+                                                setFilterCameras([...filterCameras, camId]);
+                                              }
+                                            }}
+                                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-slate-200 hover:bg-[#20212a] transition cursor-pointer"
+                                          >
+                                            <span className="truncate mr-2">{camName}</span>
+                                            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked
+                                              ? 'border-[#00a2e8] bg-[#00a2e8]'
+                                              : 'border-[#2d2f3c] bg-[#111218]'
+                                              }`}>
+                                              {isChecked && <Check size={10} className="text-white font-bold" />}
+                                            </div>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </motion.div>
                                 </>
                               )}
                             </AnimatePresence>
@@ -6089,26 +6095,26 @@ export const ReportPage = () => {
                             exit={{ opacity: 0, y: 5 }}
                             className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 overflow-hidden"
                           >
-                          <div className="max-h-40 overflow-y-auto">
-                            {[
-                              { id: 'All', name: 'Tất Cả' },
-                              ...humanGroups
-                            ].map(listOption => (
-                              <button
-                                key={listOption.id}
-                                type="button"
-                                onClick={() => {
-                                  setFilterList(listOption.id);
-                                  setIsOpenListDropdown(false);
-                                }}
-                                className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-[#20212a] ${filterList === listOption.id ? 'text-[#00a2e8] bg-[#00a2e8]/10 font-medium' : 'text-slate-300'
-                                  }`}
-                              >
-                                {listOption.name}
-                              </button>
-                            ))}
-                          </div>
-                        </motion.div>
+                            <div className="max-h-40 overflow-y-auto">
+                              {[
+                                { id: 'All', name: 'Tất Cả' },
+                                ...humanGroups
+                              ].map(listOption => (
+                                <button
+                                  key={listOption.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setFilterList(listOption.id);
+                                    setIsOpenListDropdown(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-[#20212a] ${filterList === listOption.id ? 'text-[#00a2e8] bg-[#00a2e8]/10 font-medium' : 'text-slate-300'
+                                    }`}
+                                >
+                                  {listOption.name}
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
                         </>
                       )}
                     </AnimatePresence>
@@ -6140,27 +6146,27 @@ export const ReportPage = () => {
                             exit={{ opacity: 0, y: 5 }}
                             className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 overflow-hidden"
                           >
-                          <div className="max-h-40 overflow-y-auto">
-                            {[
-                              { id: 'All', name: 'Tất cả' },
-                              { id: 'in', name: 'Vào' },
-                              { id: 'out', name: 'Ra' }
-                            ].map(opt => (
-                              <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => {
-                                  setFilterEventType(opt.id as any);
-                                  setIsOpenEventTypeDropdown(false);
-                                }}
-                                className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-[#20212a] ${filterEventType === opt.id ? 'text-[#00a2e8] bg-[#00a2e8]/10 font-medium' : 'text-slate-300'
-                                  }`}
-                              >
-                                {opt.name}
-                              </button>
-                            ))}
-                          </div>
-                        </motion.div>
+                            <div className="max-h-40 overflow-y-auto">
+                              {[
+                                { id: 'All', name: 'Tất cả' },
+                                { id: 'in', name: 'Vào' },
+                                { id: 'out', name: 'Ra' }
+                              ].map(opt => (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setFilterEventType(opt.id as any);
+                                    setIsOpenEventTypeDropdown(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-[#20212a] ${filterEventType === opt.id ? 'text-[#00a2e8] bg-[#00a2e8]/10 font-medium' : 'text-slate-300'
+                                    }`}
+                                >
+                                  {opt.name}
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
                         </>
                       )}
                     </AnimatePresence>
