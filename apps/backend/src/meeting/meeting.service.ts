@@ -684,7 +684,7 @@ export class MeetingService {
   private deduplicateEvents<T extends { object_id?: string; document_id?: string; camera_event_id?: string; area_name?: string; time_created: Date | string }>(
     events: T[],
     locationNameByCameraId: Map<string, string>,
-    windowMs: number = 30 * 1000
+    windowMs: number = 5 * 60 * 1000
   ): T[] {
     if (!events || events.length === 0) return [];
 
@@ -783,7 +783,7 @@ export class MeetingService {
       const rawEvents = await this.lcms.$queryRawUnsafe<any[]>(rawQuery);
       console.log(`[DEBUG Backend] Thực thi SQL thành công. Số lượng bản ghi thô (raw): ${rawEvents.length}`);
 
-      let windowMs = 30 * 1000; // default 30 seconds
+      let windowMs = 5 * 60 * 1000; // default 5 minutes
       if (opts.windowMinutes !== undefined) {
         windowMs = opts.windowMinutes * 60 * 1000;
       } else if (opts.windowSeconds !== undefined) {
@@ -875,7 +875,7 @@ export class MeetingService {
     `;
     const rows = await this.lcms.$queryRawUnsafe<any[]>(query);
 
-    let windowMs = 30 * 1000;
+    let windowMs = 5 * 60 * 1000; // default 5 minutes
     if (opts.windowMinutes !== undefined) {
       windowMs = opts.windowMinutes * 60 * 1000;
     } else if (opts.windowSeconds !== undefined) {
