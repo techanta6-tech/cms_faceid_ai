@@ -536,14 +536,14 @@ export class MeetingService {
     return { listMap, locationNameByCameraId };
   }
 
-  private buildEventConditions(
+  private async buildEventConditions(
     opts: {
-      search?: string; zone?: string; startDate?: string;
+      search?: string; zone?: string; zones?: string; cameras?: string; startDate?: string;
       endDate?: string; startTime?: string; endTime?: string;
       group?: string;
     },
     cameraIds?: string[]
-  ): string {
+  ): Promise<string> {
     const parts: string[] = [
       `ev.is_valid = true`,
       `ev.is_deleted = false`,
@@ -560,16 +560,58 @@ export class MeetingService {
       const s = opts.search.replace(/'/g, "''");
       parts.push(`(h.full_name ILIKE '%${s}%' OR h.document_id ILIKE '%${s}%')`);
     }
-    if (opts.zone && opts.zone !== 'All') {
-      const z = opts.zone.replace(/'/g, "''");
-      parts.push(`(ca.area_name ILIKE '%${z}%')`);
-    } else {
-      parts.push(`(ca.area_name ILIKE '%diem danh%' OR ca.area_name ILIKE '%điểm danh%')`);
+
+    let zoneCameraIds: string[] = [];
+    if (opts.zones && opts.zones !== 'All') {
+      const zoneList = opts.zones.split(',').map(z => z.trim().toLowerCase()).filter(Boolean);
+      if (zoneList.length > 0) {
+        const binds = await this.cms.location_camera_bind.findMany({ include: { location: true } });
+        zoneCameraIds = binds
+          .filter(b => b.camera_id && b.location && zoneList.includes(b.location.name.toLowerCase()))
+          .map(b => b.camera_id);
+      }
+    } else if (opts.zone && opts.zone !== 'All') {
+      const z = opts.zone.trim().toLowerCase();
+      const binds = await this.cms.location_camera_bind.findMany({ include: { location: true } });
+      zoneCameraIds = binds
+        .filter(b => b.camera_id && b.location && b.location.name.toLowerCase().includes(z))
+        .map(b => b.camera_id);
     }
+
+    if (opts.zones && opts.zones !== 'All') {
+      const zoneList = opts.zones.split(',').map(z => z.trim()).filter(Boolean);
+      if (zoneList.length > 0) {
+        const listStr = zoneList.map(z => `'${z.replace(/'/g, "''")}'`).join(', ');
+        const zoneConds = [`ca.area_name IN (${listStr})`];
+        if (zoneCameraIds.length > 0) {
+          const camListStr = zoneCameraIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
+          zoneConds.push(`es.camera_event_id IN (${camListStr})`);
+        }
+        parts.push(`(${zoneConds.join(' OR ')})`);
+      }
+    } else if (opts.zone && opts.zone !== 'All') {
+      const z = opts.zone.replace(/'/g, "''");
+      const zoneConds = [`ca.area_name ILIKE '%${z}%'`];
+      if (zoneCameraIds.length > 0) {
+        const camListStr = zoneCameraIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
+        zoneConds.push(`es.camera_event_id IN (${camListStr})`);
+      }
+      parts.push(`(${zoneConds.join(' OR ')})`);
+    }
+
     if (opts.group && opts.group !== 'All') {
       const g = opts.group.replace(/'/g, "''");
       parts.push(`('${g}' = ANY(h.list_ids))`);
     }
+
+    if (opts.cameras) {
+      const camList = opts.cameras.split(',').map(c => c.trim()).filter(Boolean);
+      if (camList.length > 0) {
+        const listStr = camList.map(c => `'${c.replace(/'/g, "''")}'`).join(', ');
+        parts.push(`es.camera_event_id IN (${listStr})`);
+      }
+    }
+
     if (cameraIds) {
       if (cameraIds.length > 0) {
         const list = cameraIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
@@ -614,12 +656,19 @@ export class MeetingService {
     const groupStr = pb.join(', ') || 'Mặc định';
     const areaName = e.camera_event_id ? locationNameByCameraId.get(e.camera_event_id) : undefined;
     const displayArea = areaName || e.area_name || 'Không xác định';
+    const cameraName = e.camera_name || e.camera_friendly_name || e.camera_event_id || 'Camera 01';
+    let huong = 'Vào';
+    if (displayArea.toLowerCase().includes('checkout') || (e.camera_name && e.camera_name.toLowerCase().includes('checkout'))) {
+      huong = 'Ra';
+    }
 
     return {
       stt: pageOffset + index + 1,
       id: e.event_id,
       vung: displayArea,
       camera_id: e.camera_event_id,
+      camera_name: cameraName,
+      huong,
       ten: e.full_name || 'Không tên',
       ma: e.document_id || e.object_id || '',
       danhSach: groupStr,
@@ -683,7 +732,7 @@ export class MeetingService {
   }
 
   async getEventLogs(opts: {
-    page?: number; limit?: number; search?: string; zone?: string;
+    page?: number; limit?: number; search?: string; zone?: string; zones?: string; cameras?: string;
     startDate?: string; endDate?: string; startTime?: string; endTime?: string;
     group?: string; eventType?: string;
     noImages?: boolean;
@@ -709,7 +758,7 @@ export class MeetingService {
         .filter(Boolean);
     }
 
-    const where = this.buildEventConditions(opts, cameraIds);
+    const where = await this.buildEventConditions(opts, cameraIds);
 
     const rawQuery = `
       SELECT
@@ -786,7 +835,7 @@ export class MeetingService {
   }
 
   async getEventLogIds(opts: {
-    page?: number; limit?: number; search?: string; zone?: string;
+    page?: number; limit?: number; search?: string; zone?: string; zones?: string; cameras?: string;
     startDate?: string; endDate?: string; startTime?: string; endTime?: string;
     group?: string; eventType?: string;
     windowSeconds?: number;
@@ -808,7 +857,7 @@ export class MeetingService {
     }
 
     const { locationNameByCameraId } = await this.buildLookupMaps();
-    const where = this.buildEventConditions(opts, cameraIds);
+    const where = await this.buildEventConditions(opts, cameraIds);
     const query = `
       SELECT
           ev.id AS event_id,
@@ -846,9 +895,11 @@ export class MeetingService {
     const formattedRows = data.map((item) => ({
       'STT': item.stt,
       'Khu vực': item.vung || '',
+      'Hướng': item.huong || 'Vào',
+      'Camera': item.camera_name || item.camera_id || item.vung || '',
       'Họ và tên': item.ten || '',
       'Mã nhân viên': item.ma || '',
-      'Phòng ban/Danh sách': item.danhSach || '',
+      'Phòng ban': item.danhSach || '',
       'Thời gian': item.thoiGian || '',
       'Độ chính xác (%)': item.accuracy || 95.0
     }));

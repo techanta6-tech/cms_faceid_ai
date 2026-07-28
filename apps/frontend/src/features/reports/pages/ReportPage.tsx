@@ -262,6 +262,11 @@ export const ReportPage = () => {
   const [appliedList, setAppliedList] = useState('All');
   const [appliedEventType, setAppliedEventType] = useState<'All' | 'in' | 'out'>('All');
   const [filterZone, setFilterZone] = useState('All');
+  const [filterZones, setFilterZones] = useState<string[]>([]);
+  const [appliedZones, setAppliedZones] = useState<string[]>([]);
+  const [filterCameras, setFilterCameras] = useState<string[]>([]);
+  const [appliedCameras, setAppliedCameras] = useState<string[]>([]);
+  const [isOpenCameraDropdown, setIsOpenCameraDropdown] = useState(false);
   const [filterList, setFilterList] = useState('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -283,6 +288,9 @@ export const ReportPage = () => {
   const [pdfExportRoster, setPdfExportRoster] = useState<any[]>([]);
   const [pdfAttendanceRoster, setPdfAttendanceRoster] = useState<any[]>([]);
   const [isAttendancePdfExporting, setIsAttendancePdfExporting] = useState(false);
+  const [attendanceCurrentPage, setAttendanceCurrentPage] = useState(1);
+  const [attendanceItemsPerPage, setAttendanceItemsPerPage] = useState(20);
+  const [isAttendancePerPageOpen, setIsAttendancePerPageOpen] = useState(false);
   const PER_PAGE_OPTIONS = [10, 20, 40, 50, 100];
   const [showAttendanceReportDemo, setShowAttendanceReportDemo] = useState(true);
 
@@ -305,7 +313,8 @@ export const ReportPage = () => {
       page: String(currentPage),
       limit: String(itemsPerPage),
       ...(appliedSearch ? { search: appliedSearch } : {}),
-      ...(appliedZone && appliedZone !== 'All' ? { zone: appliedZone } : {}),
+      ...(appliedZones.length > 0 ? { zones: appliedZones.join(',') } : (appliedZone && appliedZone !== 'All' ? { zone: appliedZone } : {})),
+      ...(appliedCameras.length > 0 ? { cameras: appliedCameras.join(',') } : {}),
       ...(appliedStartDate ? { startDate: appliedStartDate } : {}),
       ...(appliedEndDate ? { endDate: appliedEndDate } : {}),
       ...(appliedStartTime ? { startTime: appliedStartTime } : {}),
@@ -315,7 +324,7 @@ export const ReportPage = () => {
       ...extra,
     });
     return { baseUrl, params };
-  }, [currentPage, itemsPerPage, appliedSearch, appliedZone, appliedStartDate, appliedEndDate, appliedStartTime, appliedEndTime, appliedList, appliedEventType]);
+  }, [currentPage, itemsPerPage, appliedSearch, appliedZones, appliedZone, appliedCameras, appliedStartDate, appliedEndDate, appliedStartTime, appliedEndTime, appliedList, appliedEventType]);
 
   const fetchPage = useCallback(async () => {
     setIsLoadingPage(true);
@@ -907,6 +916,7 @@ export const ReportPage = () => {
   const [attendanceStartDate, setAttendanceStartDate] = useState<string>(getTodayStr);
   const [attendanceEndDate, setAttendanceEndDate] = useState<string>(getTodayStr);
   const [attendanceGroup, setAttendanceGroup] = useState<string>('All');
+  const [attendanceGroups, setAttendanceGroups] = useState<string[]>([]);
   const [isAttTypeOpen, setIsAttTypeOpen] = useState<boolean>(false);
   const [isAttGroupOpen, setIsAttGroupOpen] = useState<boolean>(false);
   const [isAttExportOpen, setIsAttExportOpen] = useState<boolean>(false);
@@ -1135,7 +1145,7 @@ export const ReportPage = () => {
     setSelectedWeeklyAttendee(null);
   }, [attendanceType]);
 
-  const generateWeeklyLogs = useCallback((empCode: string, mondayStr: string) => {
+  const generateWeeklyLogs = useCallback((empCode: string, mondayStr: string, isMock = true) => {
     const daysOfWeek = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
     const baseDate = new Date(mondayStr);
     const isPhuc = empCode === "080203011585";
@@ -1147,7 +1157,7 @@ export const ReportPage = () => {
       const dateStr = d.toISOString().split('T')[0];
 
       const isWeekend = index === 5 || index === 6;
-      if (isWeekend) {
+      if (isWeekend || !isMock) {
         return {
           dayName,
           dateStr,
@@ -1194,7 +1204,7 @@ export const ReportPage = () => {
     });
   }, [calculateWorkHours]);
 
-  const generateMonthlyLogs = useCallback((empCode: string, monthNum: number, yearNum: number) => {
+  const generateMonthlyLogs = useCallback((empCode: string, monthNum: number, yearNum: number, isMock = true) => {
     const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
     const daysOfWeekNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
     const isPhuc = empCode === "080203011585";
@@ -1210,7 +1220,7 @@ export const ReportPage = () => {
       const dateStr = `${yearNum}-${mm}-${dd}`;
 
       const isWeekend = dayOfWeekIndex === 0 || dayOfWeekIndex === 6;
-      if (isWeekend) {
+      if (isWeekend || !isMock) {
         logs.push({
           dayName,
           dateStr,
@@ -2230,21 +2240,28 @@ export const ReportPage = () => {
   const handleExportEventLogsExcel = (rows: any[]) => {
     if (!rows || rows.length === 0) return;
 
-    const formattedRows = rows.map((item, idx) => ({
-      'STT': idx + 1,
-      'Khu vực': item.vung || '',
-      'Họ và tên': item.ten || '',
-      'Mã nhân viên': item.ma || '',
-      'Phòng ban/Danh sách': item.danhSach || '',
-      'Thời gian': item.thoiGian || '',
-      'Độ chính xác (%)': item.accuracy || 95.0,
-    }));
+    const formattedRows = rows.map((item, idx) => {
+      const areaSuffix = getAreaSuffix(item);
+      const huongText = item.huong || (areaSuffix === 'vào' ? 'Vào' : (areaSuffix === 'ra' ? 'Ra' : 'Vào'));
+      const cameraText = item.camera_name || item.camera_id || item.vung || '';
+      return {
+        'STT': idx + 1,
+        'Khu vực': item.vung || '',
+        'Hướng': huongText,
+        'Camera': cameraText,
+        'Họ và tên': item.ten || '',
+        'Mã nhân viên': item.ma || '',
+        'Phòng ban': item.danhSach || '',
+        'Thời gian': item.thoiGian || '',
+        'Độ chính xác (%)': item.accuracy || 95.0,
+      };
+    });
 
     const infoRows = [
-      ['DANH SÁCH SỰ KIỆN GHI NHẬN', '', '', '', '', '', ''],
-      ['Tìm kiếm:', appliedSearch || 'Tất cả', 'Khu vực:', appliedZone === 'All' ? 'Tất cả' : appliedZone, '', '', ''],
-      ['Danh sách:', appliedList === 'All' ? 'Tất cả' : appliedList, 'Loại sự kiện:', appliedEventType === 'All' ? 'Tất cả' : (appliedEventType === 'in' ? 'Đi vào' : 'Đi ra'), '', '', ''],
-      ['Từ ngày:', appliedStartDate || 'Không giới hạn', 'Đến ngày:', appliedEndDate || 'Không giới hạn', '', '', ''],
+      ['DANH SÁCH SỰ KIỆN GHI NHẬN', '', '', '', '', '', '', '', ''],
+      ['Tìm kiếm:', appliedSearch || 'Tất cả', 'Khu vực:', appliedZones.length > 0 ? appliedZones.join(', ') : (appliedZone === 'All' ? 'Tất cả' : appliedZone), '', '', '', '', ''],
+      ['Phòng ban:', appliedList === 'All' ? 'Tất cả' : appliedList, 'Loại sự kiện:', appliedEventType === 'All' ? 'Tất cả' : (appliedEventType === 'in' ? 'Đi vào' : 'Đi ra'), '', '', '', '', ''],
+      ['Từ ngày:', appliedStartDate || 'Không giới hạn', 'Đến ngày:', appliedEndDate || 'Không giới hạn', '', '', '', '', ''],
       [],
     ];
 
@@ -2963,9 +2980,10 @@ export const ReportPage = () => {
                   <tr className="bg-[#15161f] border-b border-[#21232d] text-[11px] font-bold text-slate-400 tracking-wider sticky top-0 z-10">
                     <th className="py-2.5 px-3 border-r border-[#21232d] text-center w-12">STT</th>
                     <th className="py-2.5 px-3 border-r border-[#21232d]">Khu Vực</th>
+                    <th className="py-2.5 px-3 border-r border-[#21232d]">Camera</th>
                     <th className="py-2.5 px-3 border-r border-[#21232d]">Tên Đối Tượng</th>
-                    <th className="py-2.5 px-3 border-r border-[#21232d]">Mã Đối Tượng</th>
-                    <th className="py-2.5 px-3 border-r border-[#21232d]">Nhóm</th>
+                    <th className="py-2.5 px-3 border-r border-[#21232d]">Mã Nhân Viên</th>
+                    <th className="py-2.5 px-3 border-r border-[#21232d]">Phòng Ban</th>
                     <th className="py-2.5 px-3">Thời Gian</th>
                   </tr>
                 </thead>
@@ -2978,6 +2996,9 @@ export const ReportPage = () => {
                         </td>
                         <td className="py-2.5 px-3 border-r border-[#21232d]">
                           <div className="h-4 bg-[#1f202b] rounded-md w-28"></div>
+                        </td>
+                        <td className="py-2.5 px-3 border-r border-[#21232d]">
+                          <div className="h-4 bg-[#1f202b] rounded-md w-24"></div>
                         </td>
                         <td className="py-2.5 px-3 border-r border-[#21232d]">
                           <div className="h-4 bg-[#1f202b] rounded-md w-36"></div>
@@ -3021,6 +3042,9 @@ export const ReportPage = () => {
                               ({getAreaSuffix(log)})
                             </span>
                           </td>
+                          <td className={`py-2 px-3 border-r border-[#21232d] font-sans ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                            {(log as any).camera_name || (log as any).camera_id || 'Camera 01'}
+                          </td>
                           <td className={`py-2 px-3 border-r border-[#21232d] font-sans font-medium ${isSelected ? 'text-white' : 'text-slate-100'}`}>
                             {log.ten}
                           </td>
@@ -3040,7 +3064,7 @@ export const ReportPage = () => {
 
                   {!isLoadingLogs && currentLogs.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-500 font-sans">
+                      <td colSpan={7} className="py-8 text-center text-slate-500 font-sans">
                         <AlertTriangle size={24} className="mx-auto mb-2 text-slate-600" />
                         Không tìm thấy dữ liệu sự kiện trùng khớp.
                       </td>
@@ -3376,15 +3400,16 @@ export const ReportPage = () => {
           const isWeeklyOrMonthly = attendanceType === 'Báo cáo theo tuần' || attendanceType === 'Báo cáo theo tháng';
           const showRightSidebar = !isWeeklyOrMonthly;
 
-          const selectedGroupNameForFilter = attendanceGroup === 'All'
-            ? 'All'
-            : (humanGroups.find(g => g.id === attendanceGroup)?.name || attendanceGroup);
+          const selectedGroupNamesForFilter = attendanceGroups.map(gid => {
+            const matched = humanGroups.find(g => g.id === gid);
+            return matched ? matched.name.toLowerCase() : gid.toLowerCase();
+          });
 
           // Daily roster: real employees from DB
           const activeRealEmployees = employees.filter(emp => {
-            if (selectedGroupNameForFilter === 'All') return true;
+            if (attendanceGroups.length === 0) return true;
             const groups: string[] = emp.human_group || [];
-            return groups.some((g: string) => g.toLowerCase() === selectedGroupNameForFilter.toLowerCase());
+            return groups.some((g: string) => selectedGroupNamesForFilter.includes(g.toLowerCase()));
           });
 
           const dailyRoster = (() => {
@@ -3408,7 +3433,8 @@ export const ReportPage = () => {
               const entryEvent = match ? (match.entryEvent || null) : null;
               const exitEvent = match ? (match.exitEvent || null) : null;
 
-              if (!match && dailyReportData.length === 0) {
+              const isMockDate = attendanceStartDate === '1970-01-01';
+              if (!match && isMockDate) {
                 const scenario = mockScenarios[index % mockScenarios.length];
                 thoiGianVao = scenario.in;
                 thoiGianRa = scenario.out;
@@ -3450,6 +3476,12 @@ export const ReportPage = () => {
           });
 
           const activeEmployees = isDaily ? dailyRoster : rangeRoster;
+          const totalAttendanceItems = activeEmployees.length;
+          const totalAttendancePages = Math.ceil(totalAttendanceItems / attendanceItemsPerPage) || 1;
+          const paginatedActiveEmployees = activeEmployees.slice(
+            (attendanceCurrentPage - 1) * attendanceItemsPerPage,
+            attendanceCurrentPage * attendanceItemsPerPage
+          );
           const selectedAttendee = activeEmployees.find(emp => emp.ma === selectedAttendanceEmpCode) || activeEmployees[0];
 
           return (
@@ -3508,7 +3540,7 @@ export const ReportPage = () => {
                       </div>
                     </div>
 
-                    {/* Chọn nhóm Select */}
+                    {/* Chọn nhóm Select (Multiselect) */}
                     <div className="md:col-span-2 space-y-2 text-left relative">
                       <label className="text-[11px] font-bold text-slate-400 tracking-wider uppercase block">Chọn nhóm</label>
                       <div className="relative">
@@ -3522,37 +3554,65 @@ export const ReportPage = () => {
                           }}
                           className="w-full bg-[#1c1d26] border border-[#2d2f3c] hover:border-[#00a2e8] rounded-xl px-4 py-2.5 text-xs text-white text-left flex items-center justify-between transition-all focus:outline-none h-[42px]"
                         >
-                          <span className="font-medium text-slate-200">
+                          <span className="font-medium text-slate-200 truncate pr-1">
                             {(() => {
-                              if (attendanceGroup === 'All') return 'Tất cả (All)';
-                              const matched = humanGroups.find(g => g.id === attendanceGroup);
-                              return matched ? matched.name : attendanceGroup;
+                              if (attendanceGroups.length === 0) return 'Tất cả (All)';
+                              if (attendanceGroups.length === humanGroups.length) return `Tất cả (${humanGroups.length} Nhóm)`;
+                              return humanGroups
+                                .filter(g => attendanceGroups.includes(g.id))
+                                .map(g => g.name)
+                                .join(', ');
                             })()}
                           </span>
-                          <ChevronDown size={14} className="text-slate-400" />
+                          <ChevronDown size={14} className={`text-slate-400 transition-transform ${isAttGroupOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {isAttGroupOpen && (
                           <>
                             <div className="fixed inset-0 z-30" onClick={() => setIsAttGroupOpen(false)} />
-                            <div className="absolute left-0 right-0 mt-1.5 bg-[#181921] border border-[#2d2f3c] rounded-xl shadow-2xl z-40 py-1.5 overflow-hidden">
-                              {[
-                                { id: 'All', name: 'Tất cả (All)' },
-                                ...humanGroups
-                              ].map((grpOption) => (
+                            <div className="absolute left-0 right-0 mt-1.5 bg-[#181921] border border-[#2d2f3c] rounded-xl shadow-2xl z-40 p-2 space-y-1 w-[220px]">
+                              <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
                                 <button
-                                  key={grpOption.id}
                                   type="button"
-                                  onClick={() => {
-                                    setAttendanceGroup(grpOption.id);
-                                    setIsAttGroupOpen(false);
-                                  }}
-                                  className={`w-full text-left px-4 py-2 text-xs transition-colors hover:bg-[#20212a] flex items-center justify-between ${attendanceGroup === grpOption.id ? 'text-[#00a2e8] bg-[#00a2e8]/10 font-bold' : 'text-slate-300'
-                                    }`}
+                                  onClick={() => setAttendanceGroups(humanGroups.map(g => g.id))}
+                                  className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
                                 >
-                                  <span>{grpOption.name}</span>
-                                  {attendanceGroup === grpOption.id && <Check size={14} className="text-[#00a2e8]" />}
+                                  Chọn tất cả
                                 </button>
-                              ))}
+                                <button
+                                  type="button"
+                                  onClick={() => setAttendanceGroups([])}
+                                  className="text-[10px] text-slate-400 hover:underline font-semibold"
+                                >
+                                  Bỏ chọn
+                                </button>
+                              </div>
+                              <div className="max-h-48 overflow-y-auto space-y-1">
+                                {humanGroups.map((grp) => {
+                                  const isChecked = attendanceGroups.includes(grp.id);
+                                  return (
+                                    <button
+                                      key={grp.id}
+                                      type="button"
+                                      onClick={() => {
+                                        if (isChecked) {
+                                          setAttendanceGroups(attendanceGroups.filter(id => id !== grp.id));
+                                        } else {
+                                          setAttendanceGroups([...attendanceGroups, grp.id]);
+                                        }
+                                      }}
+                                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-slate-200 hover:bg-[#20212a] transition cursor-pointer"
+                                    >
+                                      <span className="truncate mr-2">{grp.name}</span>
+                                      <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked
+                                        ? 'border-[#00a2e8] bg-[#00a2e8]'
+                                        : 'border-[#2d2f3c] bg-[#111218]'
+                                        }`}>
+                                        {isChecked && <Check size={10} className="text-white font-bold" />}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
                           </>
                         )}
@@ -3952,11 +4012,12 @@ export const ReportPage = () => {
                         };
                       });
 
+                      const isMockDate = attendanceStartDate === '1970-01-01';
                       const logs = realLogs.length > 0
                         ? realLogs
                         : (isWeekly
-                          ? generateWeeklyLogs(selectedWeeklyAttendee.ma, attendanceStartDate)
-                          : generateMonthlyLogs(selectedWeeklyAttendee.ma, attendanceMonthNumber, attendanceYear));
+                          ? generateWeeklyLogs(selectedWeeklyAttendee.ma, attendanceStartDate, isMockDate)
+                          : generateMonthlyLogs(selectedWeeklyAttendee.ma, attendanceMonthNumber, attendanceYear, isMockDate));
                       const activeLog = logs.find(log => log.dateStr === selectedDetailDayStr) || logs[0];
 
                       return (
@@ -4066,24 +4127,16 @@ export const ReportPage = () => {
                             {attendanceType === 'Báo cáo theo ngày'
                               ? `Ngày: ${attendanceStartDate}`
                               : `Từ ${attendanceStartDate} đến ${attendanceEndDate}`
-                            } • Nhóm: {attendanceGroup === 'All' ? 'Tất cả' : (humanGroups.find(g => g.id === attendanceGroup)?.name || attendanceGroup)}
+                            } • Nhóm: {attendanceGroups.length === 0 ? 'Tất cả' : humanGroups.filter(g => attendanceGroups.includes(g.id)).map(g => g.name).join(', ')}
                           </p>
                         </div>
                       </div>
                       {(() => {
                         const isDaily = attendanceType === 'Báo cáo theo ngày';
                         const isRange = attendanceType === 'Báo cáo theo tuần' || attendanceType === 'Báo cáo theo tháng';
-                        const selectedGroupNameCount = attendanceGroup === 'All'
-                          ? 'All'
-                          : (humanGroups.find(g => g.id === attendanceGroup)?.name || attendanceGroup);
                         let activeCount = 0;
                         if (isDaily) {
-                          activeCount = selectedGroupNameCount === 'All'
-                            ? employees.length
-                            : employees.filter(emp => {
-                              const groups: string[] = emp.human_group || [];
-                              return groups.some((g: string) => g.toLowerCase() === selectedGroupNameCount.toLowerCase());
-                            }).length;
+                          activeCount = activeRealEmployees.length;
                         } else if (isRange) {
                           activeCount = rangeReportData.length;
                         }
@@ -4116,9 +4169,10 @@ export const ReportPage = () => {
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-[#1b1c24] text-xs font-mono">
-                                    {activeEmployees.map((emp, idx) => {
+                                    {paginatedActiveEmployees.map((emp, idx) => {
                                       const isPhuc = emp.ma === "080203011585";
                                       const isSelected = selectedAttendee && selectedAttendee.ma === emp.ma;
+                                      const stt = (attendanceCurrentPage - 1) * attendanceItemsPerPage + idx + 1;
                                       return (
                                         <tr
                                           key={emp.ma}
@@ -4135,7 +4189,7 @@ export const ReportPage = () => {
                                             : 'hover:bg-[#181921]/60 odd:bg-[#0e0f14] even:bg-[#101117] text-slate-300'
                                             }`}
                                         >
-                                          <td className="py-2.5 px-4 text-center text-slate-500 font-semibold">{idx + 1}</td>
+                                          <td className="py-2.5 px-4 text-center text-slate-500 font-semibold">{stt}</td>
                                           <td className="py-2.5 px-4 text-amber-500 font-bold">{emp.ma}</td>
                                           <td className={`py-2.5 px-4 font-sans font-medium ${(isSelected && !isWeeklyOrMonthly) ? 'text-[#00a2e8]' : 'text-slate-100'}`}>{emp.ten}</td>
                                           <td className="py-2.5 px-4 font-sans">{emp.danhSach}</td>
@@ -4327,6 +4381,99 @@ export const ReportPage = () => {
                           )}
                         </div>
                       )}
+                    </div>
+
+                    {/* Pagination Bar for Attendance Report Table */}
+                    <div className="h-14 bg-[#14151c] border-t border-[#21232d] px-4 flex items-center justify-between shrink-0">
+                      {/* Left: items-per-page selector */}
+                      <div className="flex items-center space-x-2">
+                        <div className="relative">
+                          <button
+                            onClick={() => setIsAttendancePerPageOpen(prev => !prev)}
+                            className="flex items-center space-x-1.5 px-2.5 py-1 bg-[#1f202b] rounded hover:bg-[#2c2d3c] text-slate-300 hover:text-white transition text-xs font-mono"
+                            title="Số hàng mỗi trang"
+                          >
+                            <span>{attendanceItemsPerPage} / trang</span>
+                            <ChevronDown size={11} className={`transition-transform duration-150 ${isAttendancePerPageOpen ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {isAttendancePerPageOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setIsAttendancePerPageOpen(false)}
+                              />
+                              <div className="absolute bottom-full left-0 mb-1 z-40 bg-[#1a1b25] border border-[#2d2f3e] rounded-lg shadow-xl overflow-hidden">
+                                {PER_PAGE_OPTIONS.map(opt => (
+                                  <button
+                                    key={opt}
+                                    onClick={() => {
+                                      setAttendanceItemsPerPage(opt);
+                                      setAttendanceCurrentPage(1);
+                                      setIsAttendancePerPageOpen(false);
+                                    }}
+                                    className={`w-full px-5 py-1.5 text-xs text-left transition whitespace-nowrap ${opt === attendanceItemsPerPage
+                                      ? 'bg-[#00a2e8]/15 text-[#00a2e8] font-semibold'
+                                      : 'text-slate-300 hover:bg-[#00a2e8]/10 hover:text-[#00a2e8]'
+                                      }`}
+                                  >
+                                    {opt} / trang
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Pagination: << < Page 1/N > >> */}
+                      <div className="flex items-center space-x-1.5 font-mono text-xs">
+                        <button
+                          onClick={() => setAttendanceCurrentPage(1)}
+                          disabled={attendanceCurrentPage === 1}
+                          className="p-1 rounded hover:bg-[#1f202b] text-slate-400 disabled:opacity-30 disabled:hover:bg-transparent transition"
+                        >
+                          <ChevronsLeft size={16} />
+                        </button>
+                        <button
+                          onClick={() => setAttendanceCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={attendanceCurrentPage === 1}
+                          className="p-1 rounded hover:bg-[#1f202b] text-slate-400 disabled:opacity-30 disabled:hover:bg-transparent transition text-xs flex items-center"
+                        >
+                          <ChevronLeft size={16} className="mr-0.5" />
+                          <span>Trang</span>
+                        </button>
+
+                        <div className="bg-[#1b1c25] border border-[#2e303f] px-3 py-1 rounded text-white flex items-center space-x-1 font-semibold font-sans">
+                          <input
+                            type="text"
+                            value={attendanceCurrentPage}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value);
+                              if (val > 0 && val <= totalAttendancePages) setAttendanceCurrentPage(val);
+                            }}
+                            className="w-4 bg-transparent text-center font-mono focus:outline-none text-[#00a2e8]"
+                          />
+                          <span className="text-slate-500">/</span>
+                          <span>{totalAttendancePages}</span>
+                        </div>
+
+                        <button
+                          onClick={() => setAttendanceCurrentPage(prev => Math.min(prev + 1, totalAttendancePages))}
+                          disabled={attendanceCurrentPage === totalAttendancePages}
+                          className="p-1 rounded hover:bg-[#1f202b] text-slate-400 disabled:opacity-30 disabled:hover:bg-transparent transition text-xs flex items-center"
+                        >
+                          <span>Trang</span>
+                          <ChevronRight size={16} className="ml-0.5" />
+                        </button>
+                        <button
+                          onClick={() => setAttendanceCurrentPage(totalAttendancePages)}
+                          disabled={attendanceCurrentPage === totalAttendancePages}
+                          className="p-1 rounded hover:bg-[#1f202b] text-slate-400 disabled:opacity-30 disabled:hover:bg-transparent transition"
+                        >
+                          <ChevronsRight size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -5736,7 +5883,7 @@ export const ReportPage = () => {
                   </div>
                 </div>
 
-                {/* 4. Khu Vực */}
+                {/* 4. Khu Vực (Multiselect) */}
                 <div className="space-y-1 text-left relative">
                   <label className="text-[11px] text-slate-300 font-semibold block">Khu Vực</label>
                   <div className="relative">
@@ -5745,57 +5892,183 @@ export const ReportPage = () => {
                       onClick={() => setIsOpenZoneDropdown(!isOpenZoneDropdown)}
                       className="w-full bg-[#181921] border border-[#2d2f3c] hover:border-[#00a2e8] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none"
                     >
-                      <span>{filterZone === 'All' ? 'Tất Cả' : filterZone}</span>
-                      <ChevronDown size={14} className="text-[#00a2e8]" />
+                      <span className="truncate pr-1">
+                        {(() => {
+                          if (filterZones.length === 0) return 'Chưa chọn khu vực';
+                          if (filterZones.length === areasData.length) return `Tất Cả (${areasData.length} KV)`;
+                          return filterZones.join(', ');
+                        })()}
+                      </span>
+                      <ChevronDown size={14} className={`text-[#00a2e8] transition-transform ${isOpenZoneDropdown ? 'rotate-180' : ''}`} />
                     </button>
 
                     <AnimatePresence>
                       {isOpenZoneDropdown && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 5 }}
-                          className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 overflow-hidden"
-                        >
-                          <div className="p-2 border-b border-[#2d2f3c] flex items-center bg-[#111218]">
-                            <Search size={12} className="text-slate-500 mr-1.5 shrink-0" />
-                            <input
-                              type="text"
-                              placeholder="Tìm nhanh khu vực..."
-                              value={zoneSearch}
-                              onChange={(e) => setZoneSearch(e.target.value)}
-                              className="w-full bg-[#181921] border border-[#2d2f3c] rounded px-2 py-1 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-[#00a2e8]"
-                              onClick={(e) => e.stopPropagation()}
-                            />
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setIsOpenZoneDropdown(false)} />
+                          <motion.div
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 5 }}
+                            className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 p-2 space-y-1"
+                          >
+                          <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
+                            <button
+                              type="button"
+                              onClick={() => setFilterZones(areasData.map(a => a.name))}
+                              className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
+                            >
+                              Chọn tất cả
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFilterZones([]);
+                                setFilterCameras([]);
+                              }}
+                              className="text-[10px] text-slate-400 hover:underline font-semibold"
+                            >
+                              Bỏ chọn
+                            </button>
                           </div>
-                          <div className="max-h-40 overflow-y-auto">
-                            {["All", ...areasData.map(a => a.name)]
-                              .filter(z => z === 'All' || z.toLowerCase().includes(zoneSearch.toLowerCase()))
-                              .map(zoneOption => (
+                          <div className="max-h-40 overflow-y-auto space-y-1">
+                            {areasData.map((area) => {
+                              const zoneName = area.name;
+                              const isChecked = filterZones.includes(zoneName);
+                              return (
                                 <button
-                                  key={zoneOption}
+                                  key={area.id}
                                   type="button"
                                   onClick={() => {
-                                    setFilterZone(zoneOption);
-                                    setIsOpenZoneDropdown(false);
-                                    setZoneSearch('');
+                                    if (isChecked) {
+                                      const next = filterZones.filter(z => z !== zoneName);
+                                      setFilterZones(next);
+                                      if (next.length === 0) setFilterCameras([]);
+                                    } else {
+                                      setFilterZones([...filterZones, zoneName]);
+                                    }
                                   }}
-                                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-[#20212a] ${filterZone === zoneOption ? 'text-[#00a2e8] bg-[#00a2e8]/10 font-medium' : 'text-slate-300'
-                                    }`}
+                                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-slate-200 hover:bg-[#20212a] transition cursor-pointer"
                                 >
-                                  {zoneOption === 'All' ? 'Tất Cả' : zoneOption}
+                                  <span className="truncate mr-2">{zoneName}</span>
+                                  <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked
+                                    ? 'border-[#00a2e8] bg-[#00a2e8]'
+                                    : 'border-[#2d2f3c] bg-[#111218]'
+                                    }`}>
+                                    {isChecked && <Check size={10} className="text-white font-bold" />}
+                                  </div>
                                 </button>
-                              ))}
+                              );
+                            })}
                           </div>
                         </motion.div>
+                        </>
                       )}
                     </AnimatePresence>
                   </div>
                 </div>
 
-                {/* 5. Nhóm (Real Database values) */}
+                {/* 4.5. Option Camera (Multiselect - Chỉ hiển thị khi đã chọn ít nhất 1 Khu vực) */}
+                {filterZones.length > 0 && (
+                  <div className="space-y-1 text-left relative">
+                    <label className="text-[11px] text-slate-300 font-semibold block flex items-center gap-1">
+                      <span>Camera thuộc Khu Vực đã chọn</span>
+                    </label>
+                    <div className="relative">
+                      {(() => {
+                        const availableCameras = areasData
+                          .filter(a => filterZones.includes(a.name))
+                          .flatMap(a => a.cameras || []);
+
+                        return (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setIsOpenCameraDropdown(!isOpenCameraDropdown)}
+                              className="w-full bg-[#181921] border border-[#2d2f3c] hover:border-[#00a2e8] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none"
+                            >
+                              <span className="truncate pr-1">
+                                {(() => {
+                                  if (filterCameras.length === 0) return 'Tất cả camera';
+                                  if (filterCameras.length === availableCameras.length) return `Tất cả (${availableCameras.length} Cam)`;
+                                  return availableCameras
+                                    .filter(c => filterCameras.includes(c.camera_id))
+                                    .map(c => c.camera_name || c.name || c.camera_id)
+                                    .join(', ');
+                                })()}
+                              </span>
+                              <ChevronDown size={14} className={`text-[#00a2e8] transition-transform ${isOpenCameraDropdown ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            <AnimatePresence>
+                              {isOpenCameraDropdown && (
+                                <>
+                                  <div className="fixed inset-0 z-40" onClick={() => setIsOpenCameraDropdown(false)} />
+                                  <motion.div
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 5 }}
+                                    className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 p-2 space-y-1"
+                                  >
+                                  <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setFilterCameras(availableCameras.map(c => c.camera_id))}
+                                      className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
+                                    >
+                                      Chọn tất cả
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setFilterCameras([])}
+                                      className="text-[10px] text-slate-400 hover:underline font-semibold"
+                                    >
+                                      Bỏ chọn
+                                    </button>
+                                  </div>
+                                  <div className="max-h-40 overflow-y-auto space-y-1">
+                                    {availableCameras.map((cam) => {
+                                      const camId = cam.camera_id;
+                                      const camName = cam.camera_name || cam.name || camId;
+                                      const isChecked = filterCameras.includes(camId);
+                                      return (
+                                        <button
+                                          key={cam.id || camId}
+                                          type="button"
+                                          onClick={() => {
+                                            if (isChecked) {
+                                              setFilterCameras(filterCameras.filter(c => c !== camId));
+                                            } else {
+                                              setFilterCameras([...filterCameras, camId]);
+                                            }
+                                          }}
+                                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-slate-200 hover:bg-[#20212a] transition cursor-pointer"
+                                        >
+                                          <span className="truncate mr-2">{camName}</span>
+                                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked
+                                            ? 'border-[#00a2e8] bg-[#00a2e8]'
+                                            : 'border-[#2d2f3c] bg-[#111218]'
+                                            }`}>
+                                            {isChecked && <Check size={10} className="text-white font-bold" />}
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </motion.div>
+                                </>
+                              )}
+                            </AnimatePresence>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. Phòng ban (Real Database values) */}
                 <div className="space-y-1 text-left relative">
-                  <label className="text-[11px] text-slate-300 font-semibold block">Nhóm</label>
+                  <label className="text-[11px] text-slate-300 font-semibold block">Phòng ban</label>
                   <div className="relative">
                     <button
                       type="button"
@@ -5808,12 +6081,14 @@ export const ReportPage = () => {
 
                     <AnimatePresence>
                       {isOpenListDropdown && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 5 }}
-                          className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 overflow-hidden"
-                        >
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setIsOpenListDropdown(false)} />
+                          <motion.div
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 5 }}
+                            className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 overflow-hidden"
+                          >
                           <div className="max-h-40 overflow-y-auto">
                             {[
                               { id: 'All', name: 'Tất Cả' },
@@ -5834,6 +6109,7 @@ export const ReportPage = () => {
                             ))}
                           </div>
                         </motion.div>
+                        </>
                       )}
                     </AnimatePresence>
                   </div>
@@ -5856,12 +6132,14 @@ export const ReportPage = () => {
 
                     <AnimatePresence>
                       {isOpenEventTypeDropdown && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 5 }}
-                          className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 overflow-hidden"
-                        >
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setIsOpenEventTypeDropdown(false)} />
+                          <motion.div
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 5 }}
+                            className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 overflow-hidden"
+                          >
                           <div className="max-h-40 overflow-y-auto">
                             {[
                               { id: 'All', name: 'Tất cả' },
@@ -5883,6 +6161,7 @@ export const ReportPage = () => {
                             ))}
                           </div>
                         </motion.div>
+                        </>
                       )}
                     </AnimatePresence>
                   </div>
@@ -5897,6 +6176,8 @@ export const ReportPage = () => {
                   onClick={() => {
                     setSearchQuery('');
                     setFilterZone('All');
+                    setFilterZones([]);
+                    setFilterCameras([]);
                     setFilterList('All');
                     setFilterEventType('All');
                     setStartDate('');
@@ -5909,6 +6190,8 @@ export const ReportPage = () => {
                     setThreshold(0.8);
                     setAppliedSearch('');
                     setAppliedZone('All');
+                    setAppliedZones([]);
+                    setAppliedCameras([]);
                     setAppliedList('All');
                     setAppliedEventType('All');
                     setAppliedStartDate('');
@@ -5926,6 +6209,8 @@ export const ReportPage = () => {
                   onClick={() => {
                     setAppliedSearch(searchQuery);
                     setAppliedZone(filterZone);
+                    setAppliedZones(filterZones);
+                    setAppliedCameras(filterCameras);
                     setAppliedList(filterList);
                     setAppliedEventType(filterEventType);
                     setAppliedStartDate(startDate);
@@ -6147,13 +6432,14 @@ export const ReportPage = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'center' }}>
             <thead>
               <tr style={{ backgroundColor: '#0078D7', color: '#ffffff', fontWeight: 'bold' }}>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '8%' }}>STT</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '15%' }}>Khu vực</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '22%' }}>Họ và tên</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '15%' }}>Mã nhân viên</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '18%' }}>Danh sách</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '22%' }}>Thời gian</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '10%' }}>Độ chính xác</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '6%' }}>STT</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '14%' }}>Khu vực</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '14%' }}>Camera</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '18%' }}>Họ và tên</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '14%' }}>Mã nhân viên</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '14%' }}>Phòng ban</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '12%' }}>Thời gian</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '8%' }}>Độ chính xác</th>
               </tr>
             </thead>
             <tbody>
@@ -6162,6 +6448,9 @@ export const ReportPage = () => {
                   <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{idx + 1}</td>
                   <td style={{ border: '1px solid #D1D5DB', padding: '8px', textAlign: 'left' }}>
                     {`${row.vung} (${getAreaSuffix(row)})`}
+                  </td>
+                  <td style={{ border: '1px solid #D1D5DB', padding: '8px', textAlign: 'left' }}>
+                    {row.camera_name || row.camera_id || 'Camera 01'}
                   </td>
                   <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: '500', textAlign: 'left' }}>{row.ten || ''}</td>
                   <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontFamily: 'monospace' }}>{row.ma || ''}</td>
