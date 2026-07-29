@@ -3,6 +3,7 @@ export interface EventLog {
   id?: string;
   vung: string;
   camera_id?: string;
+  huong?: string;
   ten: string;
   ma: string;
   danhSach: string;
@@ -63,7 +64,7 @@ export interface ChannelInfo {
   cameraMappingId?: string; // DB camera_cfg.id for pre-selection in dropdown
 }
 
-// Nhóm nhân viên, resolved từ bảng human_list (DB lcms) qua GET /human-list.
+// Phòng ban, resolved từ bảng human_list (DB lcms) qua GET /human-list.
 export interface MeetingGroup {
   id: string;
   name: string;
@@ -75,7 +76,7 @@ export interface Meeting {
   title: string;
   location_id: string;
   group_ids: string[];
-  groups: MeetingGroup[]; // resolved tên nhóm nhân viên, trả về từ BE
+  groups: MeetingGroup[]; // resolved tên phòng ban, trả về từ BE
   time_start: string; // "HH:mm"
   time_end: string; // "HH:mm"
   date_organize: string; // "YYYY-MM-DD"

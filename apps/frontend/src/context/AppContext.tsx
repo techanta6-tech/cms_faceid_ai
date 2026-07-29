@@ -125,7 +125,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         danhSach: log.phongBan,
         thoiGian: `${log.date}-${log.time}`,
         avatarSeed: `avatar_${Math.floor(Math.random() * 100)}`,
-        accuracy: parseFloat((95 + Math.random() * 5).toFixed(1)),
+        accuracy: log.accuracy || log.score || undefined,
         faceRect: { x: 30, y: 20, w: 40, h: 45 }
       };
 

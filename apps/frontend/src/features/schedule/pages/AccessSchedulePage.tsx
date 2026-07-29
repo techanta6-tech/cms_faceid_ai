@@ -569,9 +569,9 @@ export const AccessSchedulePage = () => {
                         </div>
                       </div>
 
-                      {/* Multiselect Áp dụng cho Nhóm */}
+                      {/* Multiselect Áp dụng cho Phòng ban */}
                       <div className="space-y-1.5 text-left relative">
-                        <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Áp dụng cho Nhóm</label>
+                        <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Áp dụng cho Phòng ban</label>
                         <div className="relative">
                           <button
                             type="button"
@@ -586,7 +586,7 @@ export const AccessSchedulePage = () => {
                           >
                             <div className="flex flex-wrap gap-1.5 items-center max-w-[90%] py-0.5">
                               {computedSelectedGroups.length === 0 ? (
-                                <span className="text-slate-400">Chọn nhóm nhân viên...</span>
+                                <span className="text-slate-400">Chọn phòng ban...</span>
                               ) : (
                                 computedSelectedGroups.map(gid => {
                                   const g = humanGroups.find(hg => hg.id === gid);
@@ -605,7 +605,7 @@ export const AccessSchedulePage = () => {
                               <div className="fixed inset-0 z-30" onClick={() => setIsSchGroupsOpen(false)} />
                               <div className="absolute left-0 right-0 mt-1.5 bg-[#181921] border border-[#2d2f3c] rounded-xl shadow-2xl z-40 py-1.5 overflow-hidden max-h-56 overflow-y-auto">
                                 {humanGroups.length === 0 ? (
-                                  <div className="px-4 py-3 text-xs text-slate-500 italic">Chưa có nhóm nhân viên nào.</div>
+                                  <div className="px-4 py-3 text-xs text-slate-500 italic">Chưa có phòng ban nào.</div>
                                 ) : (
                                   humanGroups.map((groupOption) => {
                                     const isSelected = computedSelectedGroups.includes(groupOption.id);
@@ -1643,9 +1643,9 @@ export const AccessSchedulePage = () => {
                               </div>
                             </div>
 
-                            {/* Multiselect nhóm nhân viên - load từ human_list thật (humanGroups) */}
+                            {/* Multiselect phòng ban - load từ human_list thật (humanGroups) */}
                             <div className="space-y-1.5 text-left relative">
-                              <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">nhóm nhân viên tham gia</label>
+                              <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">phòng ban tham gia</label>
                               <div className="relative">
                                 <button
                                   type="button"
@@ -1657,7 +1657,7 @@ export const AccessSchedulePage = () => {
                                 >
                                   <div className="flex flex-wrap gap-1.5 items-center max-w-[90%] py-0.5">
                                     {schMeetingHumanGroupIds.length === 0 ? (
-                                      <span className="text-slate-400">Chọn nhóm nhân viên...</span>
+                                      <span className="text-slate-400">Chọn phòng ban...</span>
                                     ) : (
                                       schMeetingHumanGroupIds.map(gid => {
                                         if (gid === 'all') {
@@ -2143,8 +2143,8 @@ export const AccessSchedulePage = () => {
                       });
                     } else {
                       // Layout: by-department
-                      // Luôn liệt kê TOÀN BỘ nhóm nhân viên hiện có (humanGroups), kể cả nhóm
-                      // chưa tham gia cuộc họp nào trong ngày, để người dùng thấy hết các nhóm.
+                      // Luôn liệt kê TOÀN BỘ phòng ban hiện có (humanGroups), kể cả phòng ban
+                      // chưa tham gia cuộc họp nào trong ngày, để người dùng thấy hết các phòng ban.
                       const depRows = humanGroups.map((g) => ({
                         id: g.id,
                         name: g.name,
@@ -2156,7 +2156,7 @@ export const AccessSchedulePage = () => {
                       if (depRows.length === 0) {
                         return (
                           <div className="py-12 text-center text-slate-500 text-xs font-semibold uppercase tracking-wider">
-                            Chưa có nhóm nhân viên nào, vui lòng tạo ở trang Quản lý nhân sự.
+                            Chưa có phòng ban nào, vui lòng tạo ở trang Quản lý nhân sự.
                           </div>
                         );
                       }
@@ -2168,12 +2168,12 @@ export const AccessSchedulePage = () => {
 
                         return (
                           <div key={dep.id} className="flex items-center">
-                            {/* Department Column Header - click để chọn/bỏ chọn nhóm nhân viên áp dụng */}
+                            {/* Department Column Header - click để chọn/bỏ chọn phòng ban áp dụng */}
                             <div
                               className={`w-[20%] text-left pr-4 p-2 flex flex-col justify-center cursor-pointer rounded-l-xl transition-colors ${isDepSelected ? 'bg-[#0078d7]/20 border-l-4 border-l-[#00a2e8]' : 'hover:bg-[#1a1b24]/40 border-l-4 border-l-transparent'
                                 }`}
                               onClick={() => toggleSchMeetingHumanGroup(dep.id)}
-                              title={isDepSelected ? 'Bỏ chọn nhóm nhân viên này' : 'Chọn nhóm nhân viên này để áp dụng khi tạo cuộc họp'}
+                              title={isDepSelected ? 'Bỏ chọn phòng ban này' : 'Chọn phòng ban này để áp dụng khi tạo cuộc họp'}
                             >
                               <span className={`font-bold text-xs block truncate ${isDepSelected ? 'text-[#00a2e8]' : 'text-slate-100'}`} title={depName}>
                                 {depName}

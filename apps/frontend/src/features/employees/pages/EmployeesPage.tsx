@@ -254,7 +254,7 @@ export const EmployeesPage = () => {
               <span>Quản lý nhân sự</span>
             </button>
 
-            {/* Tab 2: Quản lý nhóm nhân viên */}
+            {/* Tab 2: Quản lý phòng ban */}
             <button
               id="tab-btn-department-manage"
               onClick={() => setActiveEmployeeSubTab('humanGroups-list')}
@@ -264,7 +264,7 @@ export const EmployeesPage = () => {
                 }`}
             >
               <Layers size={14} />
-              <span>Quản lý nhóm nhân viên</span>
+              <span>Quản lý phòng ban</span>
             </button>
 
             {/* Tab 3: Thêm nhân viên */}
@@ -298,7 +298,7 @@ export const EmployeesPage = () => {
                   <Users size={16} className="text-[#00a2e8]" />
                   Danh sách nhân sự ({employees.length})
                 </h3>
-                <p className="text-[11px] text-slate-400 mt-1">Quản lý, tìm kiếm và phân nhóm nhân viên cho toàn bộ cán bộ nhân viên trong hệ thống.</p>
+                <p className="text-[11px] text-slate-400 mt-1">Quản lý, tìm kiếm và phân phòng ban cho toàn bộ cán bộ nhân viên trong hệ thống.</p>
               </div>
 
               {/* Button Thêm nhân viên */}
@@ -602,10 +602,10 @@ export const EmployeesPage = () => {
                       />
                     </div>
 
-                    {/* Nhóm nhân viên (Multiselectable) */}
+                    {/* Phòng ban (Multiselectable) */}
                     <div className="md:col-span-4 space-y-1.5 text-left">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center">
-                        Nhóm nhân viên <span className="text-red-500 ml-1 font-bold">*</span>
+                        Phòng ban <span className="text-red-500 ml-1 font-bold">*</span>
                       </label>
                       <div className="bg-[#1c1d26] border border-[#2d2f3c] rounded-xl p-2 min-h-[40px] flex flex-wrap gap-1.5">
                         {humanGroups.map(dep => {
@@ -970,12 +970,12 @@ export const EmployeesPage = () => {
           /* quản lý nhóm nhân viên */
           <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 items-start animate-fadeIn">
 
-            {/* Left Panel: danh sách nhóm nhân viên */}
+            {/* Left Panel: danh sách phòng ban */}
             <div className="md:col-span-7 bg-[#14151c] border border-[#21232d] rounded-2xl overflow-hidden shadow-xl">
               <div className="p-4 bg-[#181921] border-b border-[#21232d] flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#00a2e8]" />
-                  <span>danh sách nhóm nhân viên ({humanGroups.length})</span>
+                  <span>danh sách phòng ban ({humanGroups.length})</span>
                 </span>
                 <button
                   onClick={fetchGroups}
@@ -1010,23 +1010,23 @@ export const EmployeesPage = () => {
               </div>
             </div>
 
-            {/* Right Panel: nhóm nhân viên builder */}
+            {/* Right Panel: phòng ban builder */}
             <div className="md:col-span-5 bg-[#14151b] border border-[#21232d] rounded-2xl p-5 shadow-xl relative min-h-[220px] overflow-hidden">
               <div className={`transition-all duration-300 ${!showAddGroupDemo ? 'blur-sm pointer-events-none select-none' : ''}`}>
                 <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-5 pb-2 border-b border-slate-800/60 flex items-center space-x-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#00a2e8]" />
-                  <span>nhóm nhân viên builder</span>
+                  <span>phòng ban builder</span>
                 </h4>
 
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (!newDepartmentInput.trim()) {
-                      alert('tên nhóm nhân viên không được để trống!');
+                      alert('Tên phòng ban không được để trống!');
                       return;
                     }
                     if (humanGroups.some(d => d.name.toLowerCase() === newDepartmentInput.trim().toLowerCase())) {
-                      alert('Nhóm nhân viên này đã tồn tại!');
+                      alert('Phòng ban này đã tồn tại!');
                       return;
                     }
                     // Tạo mới chỉ cập nhật local state (chưa có API endpoint)
@@ -1036,12 +1036,12 @@ export const EmployeesPage = () => {
                   className="space-y-4"
                 >
                   <div className="space-y-1.5 text-left">
-                    <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">tên nhóm nhân viên</label>
+                    <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">tên phòng ban</label>
                     <input
                       type="text"
                       value={newDepartmentInput}
                       onChange={(e) => setNewDepartmentInput(e.target.value)}
-                      placeholder="Nhập tên nhóm nhân viên mới..."
+                      placeholder="Nhập tên phòng ban mới..."
                       className="w-full bg-[#1c1d26] border border-[#2d2f3c] focus:border-[#00a2e8] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none transition-all h-[42px]"
                     />
                   </div>
@@ -1051,7 +1051,7 @@ export const EmployeesPage = () => {
                     className="w-full py-2.5 bg-[#00a2e8] hover:bg-[#008cc9] text-white rounded-xl text-xs font-bold transition shadow-lg shadow-[#00a2e8]/20 cursor-pointer flex items-center justify-center space-x-2"
                   >
                     <Plus size={14} />
-                    <span>tạo nhóm nhân viên</span>
+                    <span>tạo phòng ban</span>
                   </button>
                 </form>
               </div>
@@ -1063,7 +1063,7 @@ export const EmployeesPage = () => {
                       <Sparkles size={16} />
                     </div>
                     <h5 className="text-[11px] font-bold text-slate-100 mb-1">Tính năng đang được hoàn thiện</h5>
-                    <p className="text-[10px] text-slate-400 mb-3 leading-tight">Chức năng thêm nhóm nhân sự đang trong quá trình phát triển hoàn chỉnh.</p>
+                    <p className="text-[10px] text-slate-400 mb-3 leading-tight">Chức năng thêm phòng ban đang trong quá trình phát triển hoàn chỉnh.</p>
                     <button
                       type="button"
                       onClick={() => setShowAddGroupDemo(true)}

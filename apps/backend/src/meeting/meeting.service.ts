@@ -553,7 +553,7 @@ export class MeetingService {
     opts: {
       search?: string; zone?: string; zones?: string; cameras?: string; startDate?: string;
       endDate?: string; startTime?: string; endTime?: string;
-      group?: string;
+      group?: string; groups?: string;
     },
     cameraIds?: string[]
   ): Promise<string> {
@@ -612,9 +612,16 @@ export class MeetingService {
       parts.push(`(${zoneConds.join(' OR ')})`);
     }
 
-    if (opts.group && opts.group !== 'All') {
-      const g = opts.group.replace(/'/g, "''");
-      parts.push(`('${g}' = ANY(h.list_ids))`);
+    const groupVal = opts.groups || opts.group;
+    if (groupVal && groupVal !== 'All') {
+      const groupList = groupVal.split(',').map(g => g.trim()).filter(Boolean);
+      if (groupList.length === 1) {
+        const g = groupList[0].replace(/'/g, "''");
+        parts.push(`('${g}' = ANY(h.list_ids))`);
+      } else if (groupList.length > 1) {
+        const listStr = groupList.map(g => `'${g.replace(/'/g, "''")}'`).join(', ');
+        parts.push(`(h.list_ids && ARRAY[${listStr}]::varchar[])`);
+      }
     }
 
     if (opts.cameras) {
@@ -675,10 +682,90 @@ export class MeetingService {
     }
     const areaName = e.camera_event_id ? locationNameByCameraId.get(e.camera_event_id) : undefined;
     const displayArea = areaName || e.area_name || 'Không xác định';
-    let huong = 'Vào';
-    if (displayArea.toLowerCase().includes('checkout') || (cameraName && cameraName.toLowerCase().includes('checkout'))) {
-      huong = 'Ra';
+    let huong = 'Đi vào';
+    if (
+      displayArea.toLowerCase().includes('checkout') ||
+      displayArea.toLowerCase().includes('ra') ||
+      (cameraName && (cameraName.toLowerCase().includes('checkout') || cameraName.toLowerCase().includes('ra')))
+    ) {
+      huong = 'Đi ra';
     }
+
+    let accuracy: number | string | undefined = undefined;
+    try {
+      const findScoreInObject = (obj: any): number | undefined => {
+        if (!obj || typeof obj !== 'object') return undefined;
+        const targetKeys = [
+          'score', 'similarity', 'accuracy', 'confidence', 'matchscore', 'facescore',
+          'matchingscore', 'sim', 'rate', 'matchrate', 'face_score', 'face_similarity',
+          'rec_score', 'recognize_score', 'compare_score', 'verification_score'
+        ];
+        for (const [key, val] of Object.entries(obj)) {
+          const lowerKey = key.toLowerCase();
+          if (targetKeys.includes(lowerKey)) {
+            if (typeof val === 'number') return val;
+            if (typeof val === 'string' && !isNaN(Number(val))) return Number(val);
+          }
+          if (val && typeof val === 'object') {
+            const nested = findScoreInObject(val);
+            if (nested !== undefined) return nested;
+          }
+        }
+        return undefined;
+      };
+
+      // 1. Try to extract from ex_info (JSON)
+      if (e.ex_info && typeof e.ex_info === 'string' && e.ex_info.trim() !== '' && e.ex_info.trim() !== '""') {
+        try {
+          const parsed = JSON.parse(e.ex_info);
+          const score = findScoreInObject(parsed);
+          if (score !== undefined && score !== null) {
+            accuracy = typeof score === 'number' && score <= 1 ? +(score * 100).toFixed(1) : score;
+          }
+        } catch (_) {}
+      } else if (e.ex_info && typeof e.ex_info === 'object') {
+        const score = findScoreInObject(e.ex_info);
+        if (score !== undefined && score !== null) {
+          accuracy = typeof score === 'number' && score <= 1 ? +(score * 100).toFixed(1) : score;
+        }
+      }
+
+      // 2. Try to extract from detail field (JSON or plain-text)
+      if (accuracy === undefined && e.detail) {
+        const detailStr = typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail);
+
+        // 2a. Try JSON parse first
+        try {
+          const parsed = JSON.parse(detailStr);
+          const score = findScoreInObject(parsed);
+          if (score !== undefined && score !== null) {
+            accuracy = typeof score === 'number' && score <= 1 ? +(score * 100).toFixed(1) : score;
+          }
+        } catch (_) {}
+
+        // 2b. Fallback: regex parse plain-text formats
+        //  "Độ tin cậy: 95%; ..."  OR  "Confidence: 95%"  OR  just "95%"
+        if (accuracy === undefined) {
+          const patterns = [
+            /(?:độ\s*tin\s*cậy|confidence|accuracy|score)\s*[:\s]+(\d+(?:\.\d+)?)\s*%/i,
+            /(\d+(?:\.\d+)?)\s*%/,
+          ];
+          for (const pattern of patterns) {
+            const match = detailStr.match(pattern);
+            if (match) {
+              const val = parseFloat(match[1]);
+              if (!isNaN(val)) {
+                accuracy = val;
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+
+
 
     return {
       stt: pageOffset + index + 1,
@@ -695,7 +782,7 @@ export class MeetingService {
       faceImgBase64,
       face_image_path: e.face_image_path,
       full_image_path: e.full_image_path,
-      accuracy: 95.0
+      accuracy
     };
   }
 
@@ -752,7 +839,7 @@ export class MeetingService {
   async getEventLogs(opts: {
     page?: number; limit?: number; search?: string; zone?: string; zones?: string; cameras?: string;
     startDate?: string; endDate?: string; startTime?: string; endTime?: string;
-    group?: string; eventType?: string;
+    group?: string; groups?: string; eventType?: string;
     noImages?: boolean;
     windowSeconds?: number;
     windowMinutes?: number;
@@ -788,7 +875,9 @@ export class MeetingService {
           h.document_id,
           h.list_ids,
           ca.camera_friendly_name AS camera_name,
-          ca.area_name
+          ca.area_name,
+          ev.ex_info,
+          es.detail
       FROM event_vms_parent ev
       INNER JOIN event_statistic_parent es ON ev.source_id = es.id
       INNER JOIN human_info h             ON es.object_id = h.id
@@ -855,7 +944,7 @@ export class MeetingService {
   async getEventLogIds(opts: {
     page?: number; limit?: number; search?: string; zone?: string; zones?: string; cameras?: string;
     startDate?: string; endDate?: string; startTime?: string; endTime?: string;
-    group?: string; eventType?: string;
+    group?: string; groups?: string; eventType?: string;
     windowSeconds?: number;
     windowMinutes?: number;
   } = {}) {
@@ -910,20 +999,69 @@ export class MeetingService {
       data = [];
     }
 
-    const formattedRows = data.map((item) => ({
-      'STT': item.stt,
-      'Khu vực': item.vung || '',
-      'Hướng': item.huong || 'Vào',
-      'Camera': item.camera_name || item.camera_id || item.vung || '',
-      'Họ và tên': item.ten || '',
-      'Mã nhân viên': item.ma || '',
-      'Phòng ban': item.danhSach || '',
-      'Thời gian': item.thoiGian || '',
-      'Độ chính xác (%)': item.accuracy || 95.0
-    }));
+    const formattedRows = data.map((item, idx) => {
+      const acc = item.accuracy;
+      const isValidScore = acc !== undefined && acc !== null && acc !== '' && acc !== 'Không có dữ liệu';
+      const accuracyValue = isValidScore
+        ? (typeof acc === 'number' ? `${acc}%` : String(acc).includes('%') ? acc : `${acc}%`)
+        : 'Không có dữ liệu';
+
+      return {
+        'STT': idx + 1,
+        'Họ và tên': item.ten || '',
+        'Mã nhân viên': item.ma || '',
+        'Phòng ban': item.danhSach || '',
+        'Khu vực': item.vung || '',
+        'Hướng': item.huong || (item.vung && item.vung.toLowerCase().includes('ra') ? 'Đi ra' : 'Đi vào'),
+        'Camera': item.camera_name || item.camera_id || item.vung || '',
+        'Thời gian': item.thoiGian || '',
+        'Độ chính xác (%)': accuracyValue
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(formattedRows);
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:G100');
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:I100');
+
+    const maxColWidths: number[] = [];
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellRef = XLSX.utils.encode_cell({ c: C, r: R });
+        if (!ws[cellRef]) continue;
+        const val = String(ws[cellRef].v || '');
+        const len = val.length;
+        if (!maxColWidths[C] || len > maxColWidths[C]) {
+          maxColWidths[C] = len;
+        }
+      }
+    }
+    ws['!cols'] = maxColWidths.map(w => ({ wch: Math.max(w + 3, 10) }));
+
+    const thinBorder = { style: 'thin', color: { rgb: 'D1D5DB' } };
+
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!ws[cellRef]) continue;
+        const cell = ws[cellRef];
+        cell.s = cell.s || {};
+        cell.s.font = { name: 'Segoe UI', sz: 10 };
+        cell.s.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+
+        if (R === 0) {
+          cell.s.font = { name: 'Segoe UI', sz: 10, bold: true, color: { rgb: 'FFFFFF' } };
+          cell.s.fill = { fgColor: { rgb: '0078D7' } };
+          cell.s.alignment = { horizontal: 'center', vertical: 'center' };
+        } else {
+          // Column 1 is "Họ và tên" -> left align, otherwise center align
+          if (C === 1) {
+            cell.s.alignment = { horizontal: 'left', vertical: 'center' };
+          } else {
+            cell.s.alignment = { horizontal: 'center', vertical: 'center' };
+          }
+        }
+      }
+    }
+
     ws['!autofilter'] = {
       ref: XLSX.utils.encode_range({
         s: { r: 0, c: 0 },
@@ -1265,17 +1403,43 @@ export class MeetingService {
       cur.setDate(cur.getDate() + 1);
     }
 
-    // 5. Collect all employee IDs from events
-    const allEmpIds = new Set<string>();
-    for (const e of checkinEvents) allEmpIds.add(e.object_id);
-    for (const e of checkoutEvents) allEmpIds.add(e.object_id);
+    // 5. Query all employees from human_info (to include personnel with 0 events as absent)
+    let empGroupSql = '';
+    const empGroupArgs: any[] = [];
+    if (groupId && groupId !== 'All') {
+      empGroupSql = 'WHERE h.list_ids && $1::varchar[]';
+      empGroupArgs.push([groupId]);
+    }
+    const allHumansSql = `
+      SELECT h.id, h.full_name, h.document_id, h.list_ids
+      FROM human_info h
+      ${empGroupSql}
+      ORDER BY h.full_name ASC;
+    `;
+    const allHumans = await this.lcms.$queryRawUnsafe<any[]>(allHumansSql, ...empGroupArgs);
+
+    const empMap = new Map<string, { id: string; name: string }>();
+    allHumans.forEach(h => {
+      empMap.set(h.id, { id: h.id, name: h.full_name });
+    });
+
+    for (const e of checkinEvents) {
+      if (!empMap.has(e.object_id)) {
+        empMap.set(e.object_id, { id: e.object_id, name: e.full_name || 'Không tên' });
+      }
+    }
+    for (const e of checkoutEvents) {
+      if (!empMap.has(e.object_id)) {
+        empMap.set(e.object_id, { id: e.object_id, name: e.full_name || 'Không tên' });
+      }
+    }
 
     const attendance: any[] = [];
 
-    for (const empId of allEmpIds) {
+    for (const [empId, empInfo] of empMap.entries()) {
       const empIn = checkinEvents.filter(e => e.object_id === empId);
       const empOut = checkoutEvents.filter(e => e.object_id === empId);
-      const empName = empIn[0]?.full_name || empOut[0]?.full_name || '';
+      const empName = empInfo.name || empIn[0]?.full_name || empOut[0]?.full_name || 'Không tên';
 
       let totalHours = 0;
       const dailyLogs: any[] = [];

@@ -28,10 +28,14 @@ import {
   CameraOff,
   Download,
   ChevronDown,
+  Loader2,
   Calendar,
   Clock,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
   Users,
   CalendarClock,
   Save,
@@ -216,6 +220,66 @@ const AttendanceEventImageSlider = ({ event, emp, title }: { event: any; emp?: a
   );
 };
 
+const handleDownloadEventImages = async (event: any) => {
+  if (!event) return;
+
+  const imagePaths: string[] = [
+    event.full_image_path,
+    event.face_image_path,
+  ].filter(Boolean);
+
+  const imagesToDownload: { url: string; filename: string }[] = [];
+
+  for (let i = 0; i < imagePaths.length; i++) {
+    const rawPath = imagePaths[i];
+    const url = resolveImageUrl(rawPath);
+    if (url) {
+      const filename = rawPath.split(/[/\\]/).pop() || `event_${event.id || event.stt || Date.now()}_${i + 1}.jpg`;
+      imagesToDownload.push({ url, filename });
+    }
+  }
+
+  if (imagesToDownload.length === 0) {
+    const fallbackUrl = event.faceImgBase64 || getMeetingPhoto(event.avatarSeed, event.ma === "010203045567", 'in');
+    if (fallbackUrl) {
+      imagesToDownload.push({
+        url: fallbackUrl,
+        filename: `event_${event.id || event.stt || Date.now()}.jpg`
+      });
+    }
+  }
+
+  if (imagesToDownload.length === 0) {
+    alert("Không tìm thấy tệp ảnh độ phân giải gốc cho sự kiện này.");
+    return;
+  }
+
+  for (const item of imagesToDownload) {
+    try {
+      const res = await fetch(item.url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = item.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Lỗi khi tải ảnh từ server:", error);
+      const link = document.createElement('a');
+      link.href = item.url;
+      link.download = item.filename;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }
+};
+
 export const ReportPage = () => {
   const location = useLocation();
   const { eventLogs, meetings, areasData, employees, isLoadingLogs, humanGroups } = useApp();
@@ -258,8 +322,8 @@ export const ReportPage = () => {
   // Data list and filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [filterEventType, setFilterEventType] = useState<'All' | 'in' | 'out'>('All');
-  const [isOpenEventTypeDropdown, setIsOpenEventTypeDropdown] = useState(false);
   const [appliedList, setAppliedList] = useState('All');
+  const [appliedLists, setAppliedLists] = useState<string[]>([]);
   const [appliedEventType, setAppliedEventType] = useState<'All' | 'in' | 'out'>('All');
   const [filterZone, setFilterZone] = useState('All');
   const [filterZones, setFilterZones] = useState<string[]>([]);
@@ -268,6 +332,14 @@ export const ReportPage = () => {
   const [appliedCameras, setAppliedCameras] = useState<string[]>([]);
   const [isOpenCameraDropdown, setIsOpenCameraDropdown] = useState(false);
   const [filterList, setFilterList] = useState('All');
+  const [filterLists, setFilterLists] = useState<string[]>([]);
+
+  // Automatically reset selected cameras to All whenever zone selection is unselectable (0 or All zones)
+  useEffect(() => {
+    if (filterZones.length === 0 || filterZones.length === areasData.length) {
+      setFilterCameras([]);
+    }
+  }, [filterZones, areasData.length]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -277,6 +349,7 @@ export const ReportPage = () => {
   const [searchImage, setSearchImage] = useState<string | null>(null);
   const [threshold, setThreshold] = useState<number>(0.8);
   const [isOpenSearchTypeDropdown, setIsOpenSearchTypeDropdown] = useState(false);
+  const [isOpenEventTypeDropdown, setIsOpenEventTypeDropdown] = useState(false);
   const [isOpenZoneDropdown, setIsOpenZoneDropdown] = useState(false);
   const [isOpenListDropdown, setIsOpenListDropdown] = useState(false);
   const [zoneSearch, setZoneSearch] = useState('');
@@ -299,6 +372,26 @@ export const ReportPage = () => {
   const [totalServerItems, setTotalServerItems] = useState(0);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
 
+  // Helper to resolve camera name from areasData context if backend returns a raw UUID
+  const resolveCameraName = useCallback((log: EventLog | any) => {
+    const rawCamName = log?.camera_name;
+    const isUUID = (str?: string) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+    const camId = log?.camera_id || (isUUID(rawCamName) ? rawCamName : null);
+    if (camId && areasData && areasData.length > 0) {
+      for (const area of areasData) {
+        const foundCam = area.cameras?.find(c => c.camera_id === camId);
+        if (foundCam && foundCam.camera_name && foundCam.camera_name !== 'Unknown') {
+          return foundCam.camera_name;
+        }
+      }
+    }
+    if (rawCamName && !isUUID(rawCamName)) {
+      return rawCamName;
+    }
+    return log?.camera_id || rawCamName || 'Camera 01';
+  }, [areasData]);
+
   // Applied filters (committed on search button click)
   const [appliedSearch, setAppliedSearch] = useState('');
   const [appliedZone, setAppliedZone] = useState('All');
@@ -306,6 +399,23 @@ export const ReportPage = () => {
   const [appliedEndDate, setAppliedEndDate] = useState('');
   const [appliedStartTime, setAppliedStartTime] = useState('');
   const [appliedEndTime, setAppliedEndTime] = useState('');
+
+  // Sorting states for Attendance Report Table
+  const [attSortKey, setAttSortKey] = useState<string>('');
+  const [attSortDir, setAttSortDir] = useState<'asc' | 'desc' | null>(null);
+
+  const handleAttSort = (key: string) => {
+    if (attSortKey !== key) {
+      setAttSortKey(key);
+      setAttSortDir('asc');
+    } else if (attSortDir === 'asc') {
+      setAttSortDir('desc');
+    } else {
+      setAttSortKey('');
+      setAttSortDir(null);
+    }
+    setAttendanceCurrentPage(1);
+  };
 
   const buildEventLogsUrl = useCallback((extra: Record<string, string> = {}) => {
     const baseUrl = getBackendUrl();
@@ -319,12 +429,12 @@ export const ReportPage = () => {
       ...(appliedEndDate ? { endDate: appliedEndDate } : {}),
       ...(appliedStartTime ? { startTime: appliedStartTime } : {}),
       ...(appliedEndTime ? { endTime: appliedEndTime } : {}),
-      ...(appliedList && appliedList !== 'All' ? { group: appliedList } : {}),
+      ...(appliedLists.length > 0 ? { groups: appliedLists.join(',') } : (appliedList && appliedList !== 'All' ? { group: appliedList } : {})),
       ...(appliedEventType && appliedEventType !== 'All' ? { eventType: appliedEventType } : {}),
       ...extra,
     });
     return { baseUrl, params };
-  }, [currentPage, itemsPerPage, appliedSearch, appliedZones, appliedZone, appliedCameras, appliedStartDate, appliedEndDate, appliedStartTime, appliedEndTime, appliedList, appliedEventType]);
+  }, [currentPage, itemsPerPage, appliedSearch, appliedZones, appliedZone, appliedCameras, appliedStartDate, appliedEndDate, appliedStartTime, appliedEndTime, appliedLists, appliedList, appliedEventType]);
 
   const fetchPage = useCallback(async () => {
     setIsLoadingPage(true);
@@ -376,9 +486,51 @@ export const ReportPage = () => {
     return () => clearInterval(timer);
   }, [buildEventLogsUrl, pageLogs, fetchPage]);
 
-  // Derived pagination values (server-side)
-  const filteredLogs = pageLogs;   // alias kept for export compatibility
-  const currentLogs = pageLogs;
+  // Sorting states for Event Logs Table
+  const [eventSortKey, setEventSortKey] = useState<string>('');
+  const [eventSortDir, setEventSortDir] = useState<'asc' | 'desc' | null>(null);
+
+  const handleEventSort = (key: string) => {
+    if (eventSortKey !== key) {
+      setEventSortKey(key);
+      setEventSortDir('asc');
+    } else if (eventSortDir === 'asc') {
+      setEventSortDir('desc');
+    } else {
+      setEventSortKey('');
+      setEventSortDir(null);
+    }
+    setCurrentPage(1);
+  };
+
+  const currentLogs = useMemo(() => {
+    if (!eventSortKey || !eventSortDir) return pageLogs;
+    return [...pageLogs].sort((a: any, b: any) => {
+      let valA = a[eventSortKey];
+      let valB = b[eventSortKey];
+      if (eventSortKey === 'camera') {
+        valA = resolveCameraName(a);
+        valB = resolveCameraName(b);
+      } else if (eventSortKey === 'huong') {
+        const areaSuffixA = getAreaSuffix(a);
+        valA = areaSuffixA === 'ra' ? 'Đi ra' : areaSuffixA === 'vào' ? 'Đi vào' : (a.huong && a.huong.toLowerCase().includes('ra') ? 'Đi ra' : 'Đi vào');
+        const areaSuffixB = getAreaSuffix(b);
+        valB = areaSuffixB === 'ra' ? 'Đi ra' : areaSuffixB === 'vào' ? 'Đi vào' : (b.huong && b.huong.toLowerCase().includes('ra') ? 'Đi ra' : 'Đi vào');
+      }
+      if (valA == null) return 1;
+      if (valB == null) return -1;
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return eventSortDir === 'asc' ? valA - valB : valB - valA;
+      }
+      const strA = String(valA).toLowerCase();
+      const strB = String(valB).toLowerCase();
+      return eventSortDir === 'asc'
+        ? strA.localeCompare(strB, 'vi')
+        : strB.localeCompare(strA, 'vi');
+    });
+  }, [pageLogs, eventSortKey, eventSortDir, getAreaSuffix, resolveCameraName]);
+
+  const filteredLogs = currentLogs;
   const totalItems = totalServerItems;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
@@ -397,7 +549,7 @@ export const ReportPage = () => {
   const [meetingDate, setMeetingDate] = useState('2026-07-09');
   const [meetingStartTime, setMeetingStartTime] = useState('16:00');
   const [meetingEndTime, setMeetingEndTime] = useState('17:00');
-  const [meetingGroups, setMeetingGroups] = useState<string[]>(['nhóm nhân viên A', 'nhóm nhân viên B', 'nhóm nhân viên C', 'nhóm nhân viên D', 'Khách hàng / Khác']);
+  const [meetingGroups, setMeetingGroups] = useState<string[]>(['Phòng ban A', 'Phòng ban B', 'Phòng ban C', 'Phòng ban D', 'Khách hàng / Khác']);
   const [isMeetingGroupDropdownOpen, setIsMeetingGroupDropdownOpen] = useState(false);
   const [meetingSearchQuery, setMeetingSearchQuery] = useState('');
   const [isMeetingSearched, setIsMeetingSearched] = useState(false);
@@ -533,10 +685,10 @@ export const ReportPage = () => {
 
       filteredMeetingsMemo.forEach(meet => {
         const inlineMapDep = (dep: string): string => {
-          if (dep === 'nhóm nhân viên 1') return 'nhóm nhân viên A';
-          if (dep === 'nhóm nhân viên 2') return 'nhóm nhân viên B';
-          if (dep === 'Nhóm nhân viên C') return 'nhóm nhân viên C';
-          if (dep === 'Nhóm nhân viên D' || dep === 'Phòng nhân sự') return 'nhóm nhân viên D';
+          if (dep === 'nhóm nhân viên 1' || dep === 'Phòng ban 1') return 'Phòng ban A';
+          if (dep === 'nhóm nhân viên 2' || dep === 'Phòng ban 2') return 'Phòng ban B';
+          if (dep === 'Nhóm nhân viên C' || dep === 'Phòng ban C') return 'Phòng ban C';
+          if (dep === 'Nhóm nhân viên D' || dep === 'Phòng nhân sự' || dep === 'Phòng ban D') return 'Phòng ban D';
           return dep;
         };
         const mappedGroups = (meet.departments || []).map(inlineMapDep);
@@ -982,26 +1134,6 @@ export const ReportPage = () => {
     }
   }, [areasData, prevAttendanceAreasKey]);
 
-  // Helper to resolve camera name from areasData context if backend returns a raw UUID
-  const resolveCameraName = useCallback((log: EventLog | any) => {
-    const rawCamName = log.camera_name;
-    const isUUID = (str?: string) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-
-    const camId = log.camera_id || (isUUID(rawCamName) ? rawCamName : null);
-    if (camId && areasData && areasData.length > 0) {
-      for (const area of areasData) {
-        const foundCam = area.cameras?.find(c => c.camera_id === camId);
-        if (foundCam && foundCam.camera_name && foundCam.camera_name !== 'Unknown') {
-          return foundCam.camera_name;
-        }
-      }
-    }
-    if (rawCamName && !isUUID(rawCamName)) {
-      return rawCamName;
-    }
-    return log.camera_id || rawCamName || 'Camera 01';
-  }, [areasData]);
-
   // Helper to extract time only (HH:mm:ss or HH:mm) from datetime string
   const formatTimeOnly = useCallback((timeStr: string): string => {
     if (!timeStr || timeStr === 'Trống' || timeStr === 'Không có dữ liệu') return timeStr;
@@ -1095,6 +1227,48 @@ export const ReportPage = () => {
 
     return { text: 'Đúng giờ', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
   }, []);
+
+  const computeRangeStats = useCallback((empItem: any) => {
+    let good = 0;
+    let late = 0;
+    let early = 0;
+    let absent = 0;
+
+    const logs = empItem.dailyLogs || empItem.logs || [];
+    if (Array.isArray(logs) && logs.length > 0) {
+      logs.forEach((log: any) => {
+        const inStr = log.thoiGianVao || log.checkIn;
+        const outStr = log.thoiGianRa || log.checkOut;
+        const hasIn = inStr && inStr !== 'Trống' && inStr !== 'Không có dữ liệu';
+        const hasOut = outStr && outStr !== 'Trống' && outStr !== 'Không có dữ liệu';
+
+        if (!hasIn && !hasOut) {
+          absent++;
+        } else {
+          const evalRes = getAttendanceStatusBadge(hasIn ? inStr : undefined, hasOut ? outStr : undefined, customShiftStart, customShiftEnd);
+          if (evalRes.text === 'Đúng giờ') {
+            good++;
+          } else {
+            if (evalRes.text.toLowerCase().includes('muộn')) late++;
+            if (evalRes.text.toLowerCase().includes('sớm')) early++;
+            if (evalRes.text.toLowerCase().includes('vắng') || evalRes.text.toLowerCase().includes('thiếu')) absent++;
+          }
+        }
+      });
+    } else {
+      const d1 = new Date(attendanceStartDate);
+      const d2 = new Date(attendanceEndDate);
+      const diffTime = Math.abs(d2.getTime() - d1.getTime());
+      const daysCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1 || 7;
+
+      good = empItem.countGood ?? 0;
+      late = empItem.countLate ?? 0;
+      early = empItem.countEarly ?? 0;
+      absent = empItem.countAbsent ?? daysCount;
+    }
+
+    return { good, late, early, absent };
+  }, [getAttendanceStatusBadge, customShiftStart, customShiftEnd, attendanceStartDate, attendanceEndDate]);
 
   // Sync attendance dates when week/month/year changes
   useEffect(() => {
@@ -1308,10 +1482,10 @@ export const ReportPage = () => {
 
   // Helper and handler for meeting report (moved to main scope)
   const mapDepToLogGroup = (dep: string): string => {
-    if (dep === 'nhóm nhân viên 1' || dep === 'nhóm nhân viên 1') return 'nhóm nhân viên A';
-    if (dep === 'nhóm nhân viên 2' || dep === 'nhóm nhân viên 2') return 'nhóm nhân viên B';
-    if (dep === 'Nhóm nhân viên C') return 'nhóm nhân viên C';
-    if (dep === 'Nhóm nhân viên D' || dep === 'Phòng nhân sự') return 'nhóm nhân viên D';
+    if (dep === 'nhóm nhân viên 1' || dep === 'Phòng ban 1') return 'Phòng ban A';
+    if (dep === 'nhóm nhân viên 2' || dep === 'Phòng ban 2') return 'Phòng ban B';
+    if (dep === 'Nhóm nhân viên C' || dep === 'Phòng ban C') return 'Phòng ban C';
+    if (dep === 'Nhóm nhân viên D' || dep === 'Phòng nhân sự' || dep === 'Phòng ban D') return 'Phòng ban D';
     return dep;
   };
 
@@ -1440,15 +1614,21 @@ export const ReportPage = () => {
 
       const baseUrl = getBackendUrl();
       // Strip image fields before sending to reduce payload size
-      const payload = dataToExport.map(({ stt, vung, camera_id, ten, ma, danhSach, thoiGian, accuracy }) => ({
-        stt,
-        vung: `${vung} (${getAreaSuffix({ stt, vung, camera_id, ten, ma, danhSach, thoiGian, avatarSeed: '' })})`,
-        ten,
-        ma,
-        danhSach,
-        thoiGian,
-        accuracy,
-      }));
+      const payload = dataToExport.map((item) => {
+        const suffix = getAreaSuffix(item);
+        const huongText = suffix === 'ra' ? 'Đi ra' : suffix === 'vào' ? 'Đi vào' : (item.huong && item.huong.toLowerCase().includes('ra') ? 'Đi ra' : 'Đi vào');
+        return {
+          stt: item.stt,
+          vung: `${item.vung} (${suffix})`,
+          huong: huongText,
+          camera_name: resolveCameraName(item),
+          ten: item.ten,
+          ma: item.ma,
+          danhSach: item.danhSach,
+          thoiGian: item.thoiGian,
+          accuracy: item.accuracy,
+        };
+      });
       const res = await fetch(`${baseUrl}/meeting/export-excel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1583,7 +1763,7 @@ export const ReportPage = () => {
           'STT': rIdx + 1,
           'Mã NV': row.emp.ma || '',
           'Họ và tên': row.emp.ten || '',
-          'Nhóm': row.emp.danhSach || '',
+          'Phòng ban': row.emp.danhSach || '',
           'Giờ vào': row.thoiGianVao || '',
           'Giờ ra': row.thoiGianRa || '',
           '% tham dự': row.ratioPercent != null ? `${row.ratioPercent}%` : '',
@@ -1603,7 +1783,7 @@ export const ReportPage = () => {
           ['Tên cuộc họp:', meetInfo.title || '', '', '', '', '', '', ''],
           ['Khu vực:', meetInfo.area || '', '', '', '', '', '', ''],
           ['Ngày:', meetInfo.date || '', '', '', '', '', '', ''],
-          ['Giờ bắt đầu:', meetInfo.startTime || '', 'Nhóm nhân viên tham gia:', (meetInfo.departments || []).join(', '), '', '', '', ''],
+          ['Giờ bắt đầu:', meetInfo.startTime || '', 'Phòng ban tham gia:', (meetInfo.departments || []).join(', '), '', '', '', ''],
           ['Giờ kết thúc:', meetInfo.endTime || '', 'Đánh giá tổng thể:', `Tham gia ${presentCount}/${totalCount} - Tổng thời gian tham gia (${avgPercent}%)`, '', '', '', ''],
           [],
         ];
@@ -1766,7 +1946,7 @@ export const ReportPage = () => {
       'STT': idx + 1,
       'Mã NV': row.emp.ma || '',
       'Họ và tên': row.emp.ten || '',
-      'Nhóm': row.emp.danhSach || '',
+      'Phòng ban': row.emp.danhSach || '',
       'Giờ vào': row.thoiGianVao || '',
       'Giờ ra': row.thoiGianRa || '',
       '% tham dự': row.ratioPercent != null ? `${row.ratioPercent}%` : '',
@@ -1786,7 +1966,7 @@ export const ReportPage = () => {
       ['Tên cuộc họp:', meetingInfo.title || '', '', '', '', '', '', ''],
       ['Khu vực:', meetingInfo.area || '', '', '', '', '', '', ''],
       ['Ngày:', meetingInfo.date || '', '', '', '', '', '', ''],
-      ['Giờ bắt đầu:', meetingInfo.startTime || '', 'Nhóm nhân viên tham gia:', (meetingInfo.departments || []).join(', '), '', '', '', ''],
+      ['Giờ bắt đầu:', meetingInfo.startTime || '', 'Phòng ban tham gia:', (meetingInfo.departments || []).join(', '), '', '', '', ''],
       ['Giờ kết thúc:', meetingInfo.endTime || '', 'Đánh giá tổng thể:', `Tham gia ${presentCount}/${totalCount} - Tổng thời gian tham gia (${avgPercent}%)`, '', '', '', ''],
       [],
     ];
@@ -2032,7 +2212,7 @@ export const ReportPage = () => {
     const infoRows = [
       ['LỊCH SỬ THAM DỰ HỌP CỦA NHÂN VIÊN', '', '', '', '', '', ''],
       ['Họ và tên:', emp.hoTen || '', '', '', '', '', ''],
-      ['Mã NV:', emp.maGiayTo || '', 'Nhóm nhân viên:', (emp.human_group || []).join(', '), '', '', ''],
+      ['Mã NV:', emp.maGiayTo || '', 'Phòng ban:', (emp.human_group || []).join(', '), '', '', ''],
       ['Số cuộc họp yêu cầu:', String(empStats.requiredCount ?? ''), 'Đúng giờ / Đi muộn / Về sớm:', `${empStats.presentOnTimeCount ?? 0} / ${empStats.lateCount ?? 0} / ${empStats.earlyCount ?? 0}`, '', '', ''],
       [],
     ];
@@ -2279,26 +2459,44 @@ export const ReportPage = () => {
 
     const formattedRows = rows.map((item, idx) => {
       const areaSuffix = getAreaSuffix(item);
-      const huongText = item.huong || (areaSuffix === 'vào' ? 'Vào' : (areaSuffix === 'ra' ? 'Ra' : 'Vào'));
+      const huongText = areaSuffix === 'ra'
+        ? 'Đi ra'
+        : areaSuffix === 'vào'
+          ? 'Đi vào'
+          : (item.huong && item.huong.toLowerCase().includes('ra') ? 'Đi ra' : 'Đi vào');
       const cameraText = resolveCameraName(item);
+      const acc = item.accuracy;
+      const isValidScore = acc !== undefined && acc !== null && acc !== '' && acc !== 'Không có dữ liệu';
+      const accuracyValue = isValidScore
+        ? (typeof acc === 'number' ? `${acc}%` : String(acc).includes('%') ? acc : `${acc}%`)
+        : 'Không có dữ liệu';
+
       return {
         'STT': idx + 1,
+        'Họ tên': item.ten || '',
+        'Mã nhân viên': item.ma || '',
+        'Phòng ban': item.danhSach || '',
         'Khu vực': item.vung || '',
         'Hướng': huongText,
         'Camera': cameraText,
-        'Họ và tên': item.ten || '',
-        'Mã nhân viên': item.ma || '',
-        'Phòng ban': item.danhSach || '',
         'Thời gian': item.thoiGian || '',
-        'Độ chính xác (%)': item.accuracy || 95.0,
+        'Độ chính xác (%)': accuracyValue,
       };
     });
 
+    const formatDateTimeFilter = (dateStr?: string, timeStr?: string) => {
+      if (!dateStr) return 'Không giới hạn';
+      if (!timeStr) return dateStr;
+      return `${dateStr} ${timeStr}`;
+    };
+
+    const tuNgayText = formatDateTimeFilter(appliedStartDate, appliedStartTime);
+    const denNgayText = formatDateTimeFilter(appliedEndDate, appliedEndTime);
+
     const infoRows = [
       ['DANH SÁCH SỰ KIỆN GHI NHẬN', '', '', '', '', '', '', '', ''],
-      ['Tìm kiếm:', appliedSearch || 'Tất cả', 'Khu vực:', appliedZones.length > 0 ? appliedZones.join(', ') : (appliedZone === 'All' ? 'Tất cả' : appliedZone), '', '', '', '', ''],
-      ['Phòng ban:', appliedList === 'All' ? 'Tất cả' : (humanGroups.find(g => g.id === appliedList)?.name || appliedList), 'Loại sự kiện:', appliedEventType === 'All' ? 'Tất cả' : (appliedEventType === 'in' ? 'Đi vào' : 'Đi ra'), '', '', '', '', ''],
-      ['Từ ngày:', appliedStartDate || 'Không giới hạn', 'Đến ngày:', appliedEndDate || 'Không giới hạn', '', '', '', '', ''],
+      ['Từ ngày:', tuNgayText, 'Từ khóa:', appliedSearch || 'Tất cả', 'Khu vực:', appliedZones.length > 0 ? appliedZones.join(', ') : (appliedZone === 'All' ? 'Tất cả' : appliedZone), '', '', ''],
+      ['Đến ngày:', denNgayText, 'Phòng ban:', appliedList === 'All' ? 'Tất cả' : (humanGroups.find(g => g.id === appliedList)?.name || appliedList), 'Loại sự kiện:', appliedEventType === 'All' ? 'Tất cả' : (appliedEventType === 'in' ? 'Đi vào' : 'Đi ra'), '', '', ''],
       [],
     ];
 
@@ -2307,11 +2505,11 @@ export const ReportPage = () => {
     XLSX.utils.sheet_add_json(infoSheet, formattedRows, { origin: 'A' + (infoRows.length + 1), skipHeader: false });
 
     // Compute column widths
-    const range = XLSX.utils.decode_range(infoSheet['!ref'] || 'A1:G100');
-    const maxColWidths = [];
+    const range = XLSX.utils.decode_range(infoSheet['!ref'] || 'A1:I100');
+    const maxColWidths: number[] = [];
     for (let R = range.s.r; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
-        if (R === 0 || ((R >= 1 && R <= 3) && C >= 4)) continue;
+        if (R === 0 || ((R >= 1 && R <= 2) && C >= 6)) continue;
         const cellRef = XLSX.utils.encode_cell({ c: C, r: R });
         if (!infoSheet[cellRef]) continue;
         const val = String(infoSheet[cellRef].v || '');
@@ -2330,8 +2528,8 @@ export const ReportPage = () => {
         const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
 
         if (!infoSheet[cellRef]) {
-          const isMetadataCell = (R >= 1 && R <= 3 && C <= 3);
-          const isTableDetailCell = (R >= 5 && C <= 6);
+          const isMetadataCell = (R >= 1 && R <= 2 && C <= 5);
+          const isTableDetailCell = (R >= 4 && C <= 8);
           if (isMetadataCell || isTableDetailCell) {
             infoSheet[cellRef] = { t: 's', v: '' };
           } else {
@@ -2346,9 +2544,9 @@ export const ReportPage = () => {
         if (R === 0) {
           cell.s.font = { name: 'Segoe UI', sz: 14, bold: true, color: { rgb: '0078D7' } };
           cell.s.alignment = { horizontal: 'center', vertical: 'center' };
-        } else if (R >= 1 && R <= 3) {
-          const isLabel = C === 0 || C === 2;
-          const isValue = C === 1 || C === 3;
+        } else if (R >= 1 && R <= 2) {
+          const isLabel = C === 0 || C === 2 || C === 4;
+          const isValue = C === 1 || C === 3 || C === 5;
           if (isLabel || isValue) {
             cell.s.font = { name: 'Segoe UI', sz: 10, bold: isLabel };
             cell.s.alignment = { horizontal: 'center', vertical: 'center' };
@@ -2359,14 +2557,14 @@ export const ReportPage = () => {
               cell.s.fill = { fgColor: { rgb: 'F3F4F6' } };
             }
           }
-        } else if (R === 5) {
+        } else if (R === 4) {
           cell.s.font = { name: 'Segoe UI', sz: 10, bold: true, color: { rgb: 'FFFFFF' } };
           cell.s.fill = { fgColor: { rgb: '0078D7' } };
           cell.s.alignment = { horizontal: 'center', vertical: 'center' };
           cell.s.border = {
             top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder
           };
-        } else if (R > 5) {
+        } else if (R > 4) {
           cell.s.alignment = { horizontal: 'center', vertical: 'center' };
           cell.s.border = {
             top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder
@@ -2381,17 +2579,17 @@ export const ReportPage = () => {
 
     infoSheet['!autofilter'] = {
       ref: XLSX.utils.encode_range({
-        s: { r: 5, c: 0 },
+        s: { r: 4, c: 0 },
         e: { r: range.e.r, c: range.e.c }
       })
     };
 
-    const rowHeights = [];
+    const rowHeights: any[] = [];
     rowHeights[0] = { hpx: 40 };
-    for (let i = 1; i <= 3; i++) rowHeights[i] = { hpx: 22 };
-    rowHeights[4] = { hpx: 12 };
-    rowHeights[5] = { hpx: 28 };
-    for (let i = 6; i <= range.e.r; i++) rowHeights[i] = { hpx: 24 };
+    for (let i = 1; i <= 2; i++) rowHeights[i] = { hpx: 22 };
+    rowHeights[3] = { hpx: 12 };
+    rowHeights[4] = { hpx: 28 };
+    for (let i = 5; i <= range.e.r; i++) rowHeights[i] = { hpx: 24 };
     infoSheet['!rows'] = rowHeights;
 
     XLSX.utils.book_append_sheet(wb, infoSheet, 'DanhSachSuKien');
@@ -2493,6 +2691,59 @@ export const ReportPage = () => {
         const isDaily = attendanceType === 'Báo cáo theo ngày';
         const isWeeklyOrMonthly = attendanceType === 'Báo cáo theo tuần' || attendanceType === 'Báo cáo theo tháng';
 
+        const calcEmployeeStats = (empItem: any) => {
+          let good = 0;
+          let late = 0;
+          let early = 0;
+          let absent = 0;
+
+          const rangeMatch = rangeReportData.find((r: any) => r.employeeId === empItem.ma || r.employeeId === empItem.id);
+          const logs = rangeMatch?.dailyLogs || empItem.dailyLogs || [];
+          if (Array.isArray(logs) && logs.length > 0) {
+            logs.forEach((log: any) => {
+              const inStr = log.thoiGianVao;
+              const outStr = log.thoiGianRa;
+              const hasIn = inStr && inStr !== 'Trống' && inStr !== 'Không có dữ liệu';
+              const hasOut = outStr && outStr !== 'Trống' && outStr !== 'Không có dữ liệu';
+
+              if (!hasIn && !hasOut) {
+                absent++;
+              } else {
+                const evalRes = getAttendanceStatusBadge(hasIn ? inStr : undefined, hasOut ? outStr : undefined, customShiftStart, customShiftEnd);
+                if (evalRes.text === 'Đúng giờ') {
+                  good++;
+                } else {
+                  if (evalRes.text.toLowerCase().includes('muộn')) late++;
+                  if (evalRes.text.toLowerCase().includes('sớm')) early++;
+                  if (evalRes.text.toLowerCase().includes('vắng') || evalRes.text.toLowerCase().includes('thiếu')) absent++;
+                }
+              }
+            });
+          } else {
+            const d1 = new Date(attendanceStartDate);
+            const d2 = new Date(attendanceEndDate);
+            const diffTime = Math.abs(d2.getTime() - d1.getTime());
+            const daysCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1 || 7;
+            absent = daysCount;
+          }
+          return { good, late, early, absent };
+        };
+
+        let totalGoodSum = 0;
+        let totalLateSum = 0;
+        let totalEarlySum = 0;
+        let totalAbsentSum = 0;
+
+        if (isWeeklyOrMonthly) {
+          roster.forEach((item: any) => {
+            const st = calcEmployeeStats(item);
+            totalGoodSum += st.good;
+            totalLateSum += st.late;
+            totalEarlySum += st.early;
+            totalAbsentSum += st.absent;
+          });
+        }
+
         // 1. Create Main Sheet formatted rows
         const formattedRows = roster.map((item, idx) => {
           if (isDaily) {
@@ -2500,19 +2751,24 @@ export const ReportPage = () => {
               'STT': idx + 1,
               'Mã NV': item.ma || 'Không có dữ liệu',
               'Họ và Tên': item.ten || 'Không có dữ liệu',
-              'Nhóm / nhóm nhân viên': item.danhSach || 'Không có dữ liệu',
+              'Phòng ban': item.danhSach || 'Không có dữ liệu',
               'Giờ Vào': (item.thoiGianVao && item.thoiGianVao !== 'Trống' && item.thoiGianVao !== 'Không có dữ liệu') ? formatTimeOnly(item.thoiGianVao) : 'Không có dữ liệu',
               'Giờ Ra': (item.thoiGianRa && item.thoiGianRa !== 'Trống' && item.thoiGianRa !== 'Không có dữ liệu') ? formatTimeOnly(item.thoiGianRa) : 'Không có dữ liệu',
               'Tổng giờ': item.totalHours || '0 h',
               'Trạng thái': item.status?.text || '-',
             };
           } else {
+            const stats = calcEmployeeStats(item);
             return {
               'STT': idx + 1,
               'Mã NV': item.ma || '',
               'Họ và Tên': item.ten || '',
-              'Nhóm / nhóm nhân viên': item.danhSach || '',
+              'Phòng ban': item.danhSach || '',
               'Tổng giờ': item.totalHours || '0 h',
+              'Hoàn thành tốt': stats.good,
+              'Đi trễ': stats.late,
+              'Về sớm': stats.early,
+              'Vắng': stats.absent,
             };
           }
         });
@@ -2531,17 +2787,23 @@ export const ReportPage = () => {
         const countAbsent = roster.filter(item => item.status?.text?.includes('Vắng')).length;
         const countLate = roster.filter(item => item.status?.text?.toLowerCase().includes('muộn')).length;
         const countEarly = roster.filter(item => item.status?.text?.toLowerCase().includes('sớm')).length;
+        const countNeedsHandling = roster.filter(item => {
+          const hasIn = item.thoiGianVao && item.thoiGianVao !== 'Trống' && item.thoiGianVao !== 'Không có dữ liệu';
+          const hasOut = item.thoiGianRa && item.thoiGianRa !== 'Trống' && item.thoiGianRa !== 'Không có dữ liệu';
+          const statusText = (item.status?.text || '').toLowerCase();
+          return (hasIn && !hasOut) || (!hasIn && hasOut) || statusText.includes('xử lý') || statusText.includes('thiếu');
+        }).length;
 
         const infoRows = isDaily ? [
-          [`BÁO CÁO ĐIỂM DANH - ${attendanceType.toUpperCase()}`, '', '', '', '', '', '', ''],
-          ['Từ ngày:', attendanceStartDate, 'Đến ngày:', attendanceEndDate, '', '', '', ''],
-          ['Nhóm:', groupNameText, 'Nhân sự hiện diện:', `${presentCount} / ${totalCount}`, '', '', '', ''],
-          ['Đúng giờ:', countOnTime.toString(), 'Vắng:', countAbsent.toString(), 'Vào muộn:', countLate.toString(), 'Về sớm:', countEarly.toString()],
+          [`BÁO CÁO CHẤM CÔNG THEO NGÀY`, '', '', '', '', '', '', ''],
+          ['Từ ngày:', attendanceStartDate, 'Phòng ban:', groupNameText, 'Đúng giờ:', countOnTime.toString(), 'Vắng:', countAbsent.toString()],
+          ['Đến ngày:', attendanceEndDate, 'Nhân sự hiện diện:', `${presentCount} / ${totalCount}`, 'Vào muộn:', countLate.toString(), 'Về sớm:', countEarly.toString()],
+          ['', '', '', '', 'Cần xử lý riêng:', countNeedsHandling.toString(), '', ''],
           [],
         ] : [
-          [`BÁO CÁO ĐIỂM DANH - ${attendanceType.toUpperCase()}`, '', '', '', ''],
-          ['Nhóm:', groupNameText, 'Từ ngày:', attendanceStartDate, ''],
-          ['Đến ngày:', attendanceEndDate, 'Số lượng nhân sự:', roster.length.toString(), ''],
+          [`BÁO CÁO CHẤM CÔNG - ${attendanceType.toUpperCase().replace('ĐIỂM DANH', 'CHẤM CÔNG')}`, '', '', '', '', '', '', '', ''],
+          ['Từ ngày:', attendanceStartDate, 'Phòng ban:', groupNameText, 'Hoàn thành tốt:', totalGoodSum.toString(), 'Đi trễ:', totalLateSum.toString()],
+          ['Đến ngày:', attendanceEndDate, 'Số lượng nhân sự:', roster.length.toString(), 'Về sớm:', totalEarlySum.toString(), 'Vắng:', totalAbsentSum.toString()],
           [],
         ];
 
@@ -2551,7 +2813,7 @@ export const ReportPage = () => {
 
         // Styling the main sheet
         const range = XLSX.utils.decode_range(mainSheet['!ref'] || 'A1:H100');
-        const maxColWidths = [];
+        const maxColWidths: number[] = [];
         for (let R = range.s.r; R <= range.e.r; ++R) {
           for (let C = range.s.c; C <= range.e.c; ++C) {
             if (R === 0 || ((R >= 1 && R <= 3) && C >= 8)) continue;
@@ -2574,7 +2836,7 @@ export const ReportPage = () => {
             const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
             if (!mainSheet[cellRef]) {
               const isMetadataCell = isDaily
-                ? (R >= 1 && R <= 3 && C <= 7)
+                ? ((R >= 1 && R <= 2 && C <= 7) || (R === 3 && (C === 4 || C === 5)))
                 : (R >= 1 && R <= 2 && C <= 3);
               const isTableDetailCell = (R >= tableHeaderRowIndex && C <= (isDaily ? 7 : 4));
               if (isMetadataCell || isTableDetailCell) {
@@ -2591,14 +2853,8 @@ export const ReportPage = () => {
             if (R === 0) {
               cell.s.font = { name: 'Segoe UI', sz: 14, bold: true, color: { rgb: '0078D7' } };
               cell.s.alignment = { horizontal: 'center', vertical: 'center' };
-            } else if (R >= 1 && R < tableHeaderRowIndex - 1) {
-              let isLabel = false;
-              if (isDaily) {
-                if (R === 1 || R === 2) isLabel = C === 0 || C === 2;
-                else if (R === 3) isLabel = C % 2 === 0;
-              } else {
-                isLabel = C === 0 || C === 2;
-              }
+            } else if ((R >= 1 && R <= 2 && C <= 7) || (R === 3 && (C === 4 || C === 5))) {
+              const isLabel = C % 2 === 0;
               cell.s.font = { name: 'Segoe UI', sz: 10, bold: isLabel };
               cell.s.alignment = { horizontal: 'center', vertical: 'center' };
               cell.s.border = {
@@ -3015,13 +3271,60 @@ export const ReportPage = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[#15161f] border-b border-[#21232d] text-[11px] font-bold text-slate-400 tracking-wider sticky top-0 z-10">
-                    <th className="py-2.5 px-3 border-r border-[#21232d] text-center w-12">STT</th>
-                    <th className="py-2.5 px-3 border-r border-[#21232d]">Khu Vực</th>
-                    <th className="py-2.5 px-3 border-r border-[#21232d]">Camera</th>
-                    <th className="py-2.5 px-3 border-r border-[#21232d]">Tên Đối Tượng</th>
-                    <th className="py-2.5 px-3 border-r border-[#21232d]">Mã Nhân Viên</th>
-                    <th className="py-2.5 px-3 border-r border-[#21232d]">Phòng Ban</th>
-                    <th className="py-2.5 px-3">Thời Gian</th>
+                    <th onClick={() => handleEventSort('stt')} className="py-2.5 px-3 border-r border-[#21232d] text-center w-12 cursor-pointer hover:text-white select-none">
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>STT</span>
+                        {eventSortKey === 'stt' ? (eventSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                      </div>
+                    </th>
+                    <th onClick={() => handleEventSort('ten')} className="py-2.5 px-3 border-r border-[#21232d] text-left cursor-pointer hover:text-white select-none">
+                      <div className="flex items-center justify-start space-x-1">
+                        <span>Họ tên</span>
+                        {eventSortKey === 'ten' ? (eventSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                      </div>
+                    </th>
+                    <th onClick={() => handleEventSort('ma')} className="py-2.5 px-3 border-r border-[#21232d] text-center cursor-pointer hover:text-white select-none">
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Mã nhân viên</span>
+                        {eventSortKey === 'ma' ? (eventSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                      </div>
+                    </th>
+                    <th onClick={() => handleEventSort('danhSach')} className="py-2.5 px-3 border-r border-[#21232d] text-center cursor-pointer hover:text-white select-none">
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Phòng ban</span>
+                        {eventSortKey === 'danhSach' ? (eventSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                      </div>
+                    </th>
+                    <th onClick={() => handleEventSort('vung')} className="py-2.5 px-3 border-r border-[#21232d] text-center cursor-pointer hover:text-white select-none">
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Khu vực</span>
+                        {eventSortKey === 'vung' ? (eventSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                      </div>
+                    </th>
+                    <th onClick={() => handleEventSort('huong')} className="py-2.5 px-3 border-r border-[#21232d] text-center cursor-pointer hover:text-white select-none">
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Hướng</span>
+                        {eventSortKey === 'huong' ? (eventSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                      </div>
+                    </th>
+                    <th onClick={() => handleEventSort('camera')} className="py-2.5 px-3 border-r border-[#21232d] text-center cursor-pointer hover:text-white select-none">
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Camera</span>
+                        {eventSortKey === 'camera' ? (eventSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                      </div>
+                    </th>
+                    <th onClick={() => handleEventSort('thoiGian')} className="py-2.5 px-3 border-r border-[#21232d] text-center cursor-pointer hover:text-white select-none">
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Thời gian</span>
+                        {eventSortKey === 'thoiGian' ? (eventSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                      </div>
+                    </th>
+                    <th onClick={() => handleEventSort('accuracy')} className="py-2.5 px-3 text-center cursor-pointer hover:text-white select-none">
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Độ chính xác (%)</span>
+                        {eventSortKey === 'accuracy' ? (eventSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1b1c24] text-xs font-mono">
@@ -3038,16 +3341,22 @@ export const ReportPage = () => {
                           <div className="h-4 bg-[#1f202b] rounded-md w-24"></div>
                         </td>
                         <td className="py-2.5 px-3 border-r border-[#21232d]">
-                          <div className="h-4 bg-[#1f202b] rounded-md w-36"></div>
+                          <div className="h-4 bg-[#1f202b] rounded-md w-24"></div>
                         </td>
                         <td className="py-2.5 px-3 border-r border-[#21232d]">
                           <div className="h-4 bg-[#1f202b] rounded-md w-24"></div>
                         </td>
                         <td className="py-2.5 px-3 border-r border-[#21232d]">
-                          <div className="h-4 bg-[#1f202b] rounded-md w-20"></div>
+                          <div className="h-4 bg-[#1f202b] rounded-md w-16"></div>
+                        </td>
+                        <td className="py-2.5 px-3 border-r border-[#21232d]">
+                          <div className="h-4 bg-[#1f202b] rounded-md w-24"></div>
+                        </td>
+                        <td className="py-2.5 px-3 border-r border-[#21232d]">
+                          <div className="h-4 bg-[#1f202b] rounded-md w-28"></div>
                         </td>
                         <td className="py-2.5 px-3">
-                          <div className="h-4 bg-[#1f202b] rounded-md w-32"></div>
+                          <div className="h-4 bg-[#1f202b] rounded-md w-20"></div>
                         </td>
                       </tr>
                     ))
@@ -3055,13 +3364,24 @@ export const ReportPage = () => {
                     currentLogs.map((log) => {
                       const isSelected = selectedEventId === log.stt;
                       const isTranPhuocLoi = log.ma === "010203045567";
+                      const areaSuffix = getAreaSuffix(log);
+                      const huongText = areaSuffix === 'ra' ? 'Đi ra' : areaSuffix === 'vào' ? 'Đi vào' : (log.huong && log.huong.toLowerCase().includes('ra') ? 'Đi ra' : 'Đi vào');
+                      const getAccuracyText = (logItem: EventLog) => {
+                        const acc = logItem.accuracy;
+                        const accStr = String(acc ?? '');
+                        const isValidScore = acc !== undefined && acc !== null && accStr !== '' && accStr !== 'Không có dữ liệu';
+                        return isValidScore
+                          ? (typeof acc === 'number' ? `${acc}%` : accStr.includes('%') ? accStr : `${accStr}%`)
+                          : 'Không có dữ liệu';
+                      };
+                      const accuracyDisplay = getAccuracyText(log);
                       return (
                         <tr
                           id={`event-row-${log.stt}`}
                           key={log.stt}
                           onClick={() => {
                             setSelectedEventId(log.stt);
-                            setSelectedThumbIndex(0); // Reset thumbnail zoom index
+                            setSelectedThumbIndex(0);
                           }}
                           className={`cursor-pointer transition duration-150 ${isSelected
                             ? 'bg-[#005a9e] text-white hover:bg-[#0062ac]'
@@ -3073,26 +3393,29 @@ export const ReportPage = () => {
                           <td className="py-2 px-3 border-r border-[#21232d] text-center font-semibold text-slate-400">
                             {log.stt}
                           </td>
-                          <td className={`py-2 px-3 border-r border-[#21232d] ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                            {log.vung}
-                            <span className={`ml-1 text-[10px] font-sans ${isSelected ? 'text-blue-200' : 'text-slate-500'}`}>
-                              ({getAreaSuffix(log)})
-                            </span>
-                          </td>
-                          <td className={`py-2 px-3 border-r border-[#21232d] font-sans ${isSelected ? 'text-[#00a2e8] font-bold' : 'text-slate-300'}`}>
-                            {resolveCameraName(log)}
-                          </td>
-                          <td className={`py-2 px-3 border-r border-[#21232d] font-sans font-medium ${isSelected ? 'text-white' : 'text-slate-100'}`}>
+                          <td className={`py-2 px-3 border-r border-[#21232d] font-sans font-medium text-left ${isSelected ? 'text-white' : 'text-slate-100'}`}>
                             {log.ten}
                           </td>
-                          <td className="py-2 px-3 border-r border-[#21232d] text-slate-400">
+                          <td className="py-2 px-3 border-r border-[#21232d] text-center text-slate-400">
                             {log.ma}
                           </td>
-                          <td className={`py-2 px-3 border-r border-[#21232d] font-sans ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                          <td className={`py-2 px-3 border-r border-[#21232d] text-center font-sans ${isSelected ? 'text-white' : 'text-slate-300'}`}>
                             {log.danhSach}
                           </td>
-                          <td className="py-2 px-3 text-slate-400">
+                          <td className={`py-2 px-3 border-r border-[#21232d] text-center ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                            {log.vung}
+                          </td>
+                          <td className={`py-2 px-3 border-r border-[#21232d] text-center font-sans ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                            {huongText}
+                          </td>
+                          <td className={`py-2 px-3 border-r border-[#21232d] text-center font-sans ${isSelected ? 'text-[#00a2e8] font-bold' : 'text-slate-300'}`}>
+                            {resolveCameraName(log)}
+                          </td>
+                          <td className="py-2 px-3 border-r border-[#21232d] text-center text-slate-400">
                             {log.thoiGian}
+                          </td>
+                          <td className={`py-2 px-3 text-center font-sans ${isSelected ? 'text-white' : 'text-slate-400'}`}>
+                            {accuracyDisplay}
                           </td>
                         </tr>
                       );
@@ -3101,7 +3424,7 @@ export const ReportPage = () => {
 
                   {!isLoadingLogs && currentLogs.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-500 font-sans">
+                      <td colSpan={9} className="py-8 text-center text-slate-500 font-sans">
                         <AlertTriangle size={24} className="mx-auto mb-2 text-slate-600" />
                         Không tìm thấy dữ liệu sự kiện trùng khớp.
                       </td>
@@ -3411,17 +3734,15 @@ export const ReportPage = () => {
                     )}
                   </button>
 
-                  {/* Thumbnail 4: Tải ảnh & video đính kèm */}
+                  {/* Thumbnail 4: Tải ảnh độ phân giải gốc từ BE */}
                   <button
-                    onClick={() => {
-                      alert("Đang chuẩn bị tải xuống toàn bộ tập tin hình ảnh và video đính kèm chất lượng cao...");
-                    }}
+                    onClick={() => handleDownloadEventImages(currentSelectedEvent)}
                     className="aspect-square rounded border border-[#2d2f3e] bg-[#1c1d24] hover:bg-[#252731] hover:border-[#00a2e8] flex flex-col items-center justify-center space-y-1 transition group"
-                    title="Tải các ảnh & video đính kèm"
+                    title="Tải ảnh độ phân giải gốc từ server"
                   >
                     <Download size={18} className="text-slate-400 group-hover:text-[#00a2e8] transition" />
                     <span className="text-[9px] text-slate-400 group-hover:text-slate-200 transition text-center leading-tight">
-                      Tải ảnh/video
+                      Tải ảnh
                     </span>
                   </button>
                 </div>
@@ -4175,13 +4496,44 @@ export const ReportPage = () => {
                       {(() => {
                         const isDaily = attendanceType === 'Báo cáo theo ngày';
                         const isRange = attendanceType === 'Báo cáo theo tuần' || attendanceType === 'Báo cáo theo tháng';
-                        let activeCount = 0;
-                        if (isDaily) {
-                          activeCount = activeRealEmployees.length;
-                        } else if (isRange) {
-                          activeCount = rangeReportData.length;
+                        let activeCount = activeRealEmployees.length;
+
+                        if (isRange) {
+                          let totalGood = 0;
+                          let totalLate = 0;
+                          let totalEarly = 0;
+                          let totalAbsent = 0;
+                          activeRealEmployees.forEach((emp: any) => {
+                            const rangeItem = rangeReportData.find((r: any) => r.employeeId === emp.ma || r.employeeId === emp.id);
+                            const st = computeRangeStats(rangeItem || emp);
+                            totalGood += st.good;
+                            totalLate += st.late;
+                            totalEarly += st.early;
+                            totalAbsent += st.absent;
+                          });
+
+                          return (
+                            <div className="flex items-center space-x-3 text-[11px] font-mono">
+                              <div className="text-slate-400">
+                                Nhân sự: <span className="text-white font-bold">{activeCount}</span>
+                              </div>
+                              <div className="text-emerald-400">
+                                Hoàn thành tốt: <span className="font-bold">{totalGood}</span>
+                              </div>
+                              <div className="text-amber-400">
+                                Đi trễ: <span className="font-bold">{totalLate}</span>
+                              </div>
+                              <div className="text-amber-400">
+                                Về sớm: <span className="font-bold">{totalEarly}</span>
+                              </div>
+                              <div className="text-rose-400">
+                                Vắng: <span className="font-bold">{totalAbsent}</span>
+                              </div>
+                            </div>
+                          );
                         }
-                                                return (
+
+                        return (
                           <div className="text-[11px] font-mono text-slate-400">
                             Phát hiện: <span className="text-white font-bold font-mono">{activeCount}</span> nhân sự
                           </div>
@@ -4199,20 +4551,99 @@ export const ReportPage = () => {
                                 <>
                                   <thead>
                                     <tr className="bg-[#15161f] border-b border-[#21232d] text-[10px] font-bold text-slate-400 tracking-wider uppercase">
-                                      <th className="py-3 px-4 text-center w-12">STT</th>
-                                      <th className="py-3 px-4">Mã NV</th>
-                                      <th className="py-3 px-4">Họ và Tên</th>
-                                      <th className="py-3 px-4">Nhóm / nhóm nhân viên</th>
-                                      {!isWeeklyOrMonthly && <th className="py-3 px-4">Giờ Vào</th>}
-                                      {!isWeeklyOrMonthly && <th className="py-3 px-4">Giờ Ra</th>}
-                                      <th className="py-3 px-4">Tổng giờ</th>
-                                      {!isWeeklyOrMonthly && <th className="py-3 px-4 text-center">Trạng thái</th>}
+                                       <th onClick={() => handleAttSort('stt')} className="py-3 px-4 text-center w-12 cursor-pointer hover:text-white select-none">
+                                         <div className="flex items-center justify-center space-x-1">
+                                           <span>STT</span>
+                                           {attSortKey === 'stt' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                         </div>
+                                       </th>
+                                       <th onClick={() => handleAttSort('ma')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                         <div className="flex items-center justify-center space-x-1">
+                                           <span>Mã NV</span>
+                                           {attSortKey === 'ma' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                         </div>
+                                       </th>
+                                       <th onClick={() => handleAttSort('ten')} className="py-3 px-4 text-left cursor-pointer hover:text-white select-none">
+                                         <div className="flex items-center justify-start space-x-1">
+                                           <span>Họ và Tên</span>
+                                           {attSortKey === 'ten' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                         </div>
+                                       </th>
+                                       <th onClick={() => handleAttSort('danhSach')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                         <div className="flex items-center justify-center space-x-1">
+                                           <span>Phòng ban</span>
+                                           {attSortKey === 'danhSach' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                         </div>
+                                       </th>
+                                       {!isWeeklyOrMonthly && (
+                                         <th onClick={() => handleAttSort('thoiGianVao')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                           <div className="flex items-center justify-center space-x-1">
+                                             <span>Giờ Vào</span>
+                                             {attSortKey === 'thoiGianVao' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                           </div>
+                                         </th>
+                                       )}
+                                       {!isWeeklyOrMonthly && (
+                                         <th onClick={() => handleAttSort('thoiGianRa')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                           <div className="flex items-center justify-center space-x-1">
+                                             <span>Giờ Ra</span>
+                                             {attSortKey === 'thoiGianRa' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                           </div>
+                                         </th>
+                                       )}
+                                       <th onClick={() => handleAttSort('totalHours')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                         <div className="flex items-center justify-center space-x-1">
+                                           <span>Tổng giờ</span>
+                                           {attSortKey === 'totalHours' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                         </div>
+                                       </th>
+                                       {isWeeklyOrMonthly && (
+                                         <th onClick={() => handleAttSort('good')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                           <div className="flex items-center justify-center space-x-1">
+                                             <span>Hoàn thành tốt</span>
+                                             {attSortKey === 'good' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                           </div>
+                                         </th>
+                                       )}
+                                       {isWeeklyOrMonthly && (
+                                         <th onClick={() => handleAttSort('late')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                           <div className="flex items-center justify-center space-x-1">
+                                             <span>Đi trễ</span>
+                                             {attSortKey === 'late' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                           </div>
+                                         </th>
+                                       )}
+                                       {isWeeklyOrMonthly && (
+                                         <th onClick={() => handleAttSort('early')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                           <div className="flex items-center justify-center space-x-1">
+                                             <span>Về sớm</span>
+                                             {attSortKey === 'early' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                           </div>
+                                         </th>
+                                       )}
+                                       {isWeeklyOrMonthly && (
+                                         <th onClick={() => handleAttSort('absent')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                           <div className="flex items-center justify-center space-x-1">
+                                             <span>Vắng</span>
+                                             {attSortKey === 'absent' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                           </div>
+                                         </th>
+                                       )}
+                                       {!isWeeklyOrMonthly && (
+                                         <th onClick={() => handleAttSort('status')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                           <div className="flex items-center justify-center space-x-1">
+                                             <span>Trạng thái</span>
+                                             {attSortKey === 'status' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                           </div>
+                                         </th>
+                                       )}
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-[#1b1c24] text-xs font-mono">
                                     {paginatedActiveEmployees.map((emp, idx) => {
                                       const isSelected = selectedAttendee && selectedAttendee.ma === emp.ma;
                                       const stt = (attendanceCurrentPage - 1) * attendanceItemsPerPage + idx + 1;
+                                      const rangeStats = computeRangeStats(emp);
                                       return (
                                         <tr
                                           key={emp.ma}
@@ -4230,12 +4661,16 @@ export const ReportPage = () => {
                                             }`}
                                         >
                                           <td className="py-2.5 px-4 text-center text-slate-500 font-semibold">{stt}</td>
-                                          <td className="py-2.5 px-4 text-amber-500 font-bold">{emp.ma}</td>
+                                          <td className="py-2.5 px-4 text-slate-400 font-normal">{emp.ma}</td>
                                           <td className={`py-2.5 px-4 font-sans font-medium ${(isSelected && !isWeeklyOrMonthly) ? 'text-[#00a2e8]' : 'text-slate-100'}`}>{emp.ten}</td>
                                           <td className="py-2.5 px-4 font-sans">{emp.danhSach}</td>
                                           {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianVao && emp.thoiGianVao !== 'Trống' && emp.thoiGianVao !== 'Không có dữ liệu' ? formatTimeOnly(emp.thoiGianVao) : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
                                           {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianRa && emp.thoiGianRa !== 'Trống' && emp.thoiGianRa !== 'Không có dữ liệu' ? formatTimeOnly(emp.thoiGianRa) : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
                                           <td className="py-2.5 px-4 text-white font-bold">{emp.totalHours || '0 h'}</td>
+                                          {isWeeklyOrMonthly && <td className="py-2.5 px-4 text-center text-emerald-400 font-bold">{rangeStats.good}</td>}
+                                          {isWeeklyOrMonthly && <td className="py-2.5 px-4 text-center text-amber-400 font-bold">{rangeStats.late}</td>}
+                                          {isWeeklyOrMonthly && <td className="py-2.5 px-4 text-center text-amber-400 font-bold">{rangeStats.early}</td>}
+                                          {isWeeklyOrMonthly && <td className="py-2.5 px-4 text-center text-rose-400 font-bold">{rangeStats.absent}</td>}
                                           {!isWeeklyOrMonthly && (
                                             <td className="py-2.5 px-4 text-center">
                                               {emp.status ? (
@@ -5501,8 +5936,8 @@ export const ReportPage = () => {
                         {/* Stat 2 */}
                         <div className="bg-[#181921] border border-[#2d2f3c]/60 rounded-xl p-3 flex items-center justify-between">
                           <div className="space-y-0.5 text-left">
-                            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">nhóm nhân viên tham gia</span>
-                            <span className="text-xl font-bold text-white font-mono">{deptsCount}</span>
+                            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">phòng ban tham gia</span>
+                            <span className="text-xl font-bold text-[#00a2e8] font-mono">{deptsCount}</span>
                           </div>
                           <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                             <Layers size={16} />
@@ -5532,7 +5967,7 @@ export const ReportPage = () => {
                               <AlertTriangle size={36} className="text-slate-600 mb-2.5 animate-bounce" />
                               <span className="text-xs font-semibold uppercase tracking-wider mb-1 text-slate-400">Không tìm thấy người tham gia</span>
                               <p className="text-[11px] max-w-xs text-slate-500 leading-relaxed">
-                                Vui lòng đổi ngày (ví dụ: 09/07/2026), thay đổi khoảng thời gian check-in hoặc chọn thêm nhóm nhân viên tham dự họp.
+                                Vui lòng đổi ngày (ví dụ: 09/07/2026), thay đổi khoảng thời gian check-in hoặc chọn thêm phòng ban tham dự họp.
                               </p>
                             </div>
                           ) : (
@@ -5542,7 +5977,7 @@ export const ReportPage = () => {
                                   <th className="py-2.5 px-4 w-12 text-center">STT</th>
                                   <th className="py-2.5 px-3">Tên nhân sự</th>
                                   <th className="py-2.5 px-3">Mã nhân sự</th>
-                                  <th className="py-2.5 px-3">nhóm nhân viên</th>
+                                  <th className="py-2.5 px-3">Phòng ban</th>
                                   <th className="py-2.5 px-3">Thời gian vào phòng</th>
                                   <th className="py-2.5 px-3">Thời gian rời phòng</th>
                                   <th className="py-2.5 px-3 text-center">% tham dự</th>
@@ -6008,105 +6443,113 @@ export const ReportPage = () => {
                   </div>
                 </div>
 
-                {/* 4.5. Option Camera (Multiselect - Chỉ hiển thị khi đã chọn ít nhất 1 Khu vực) */}
-                {filterZones.length > 0 && (
-                  <div className="space-y-1 text-left relative">
-                    <label className="text-[11px] text-slate-300 font-semibold block flex items-center gap-1">
-                      <span>Camera thuộc Khu Vực đã chọn</span>
-                    </label>
-                    <div className="relative">
-                      {(() => {
-                        const availableCameras = areasData
-                          .filter(a => filterZones.includes(a.name))
-                          .flatMap(a => a.cameras || []);
+                {/* 4.5. Option Camera (Multiselect - Hiện sẵn, unselectable khi số khu vực là 0 hoặc all) */}
+                {(() => {
+                  const isCameraDisabled = filterZones.length === 0 || filterZones.length === areasData.length;
+                  const availableCameras = isCameraDisabled
+                    ? []
+                    : areasData
+                      .filter(a => filterZones.includes(a.name))
+                      .flatMap(a => a.cameras || []);
 
-                        return (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => setIsOpenCameraDropdown(!isOpenCameraDropdown)}
-                              className="w-full bg-[#181921] border border-[#2d2f3c] hover:border-[#00a2e8] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none"
-                            >
-                              <span className="truncate pr-1">
-                                {(() => {
-                                  if (filterCameras.length === 0) return 'Tất cả camera';
-                                  if (filterCameras.length === availableCameras.length) return `Tất cả (${availableCameras.length} Cam)`;
-                                  return availableCameras
-                                    .filter(c => filterCameras.includes(c.camera_id))
-                                    .map(c => c.camera_name || c.camera_id)
-                                    .join(', ');
-                                })()}
-                              </span>
-                              <ChevronDown size={14} className={`text-[#00a2e8] transition-transform ${isOpenCameraDropdown ? 'rotate-180' : ''}`} />
-                            </button>
+                  return (
+                    <div className="space-y-1 text-left relative">
+                      <label className="text-[11px] text-slate-300 font-semibold block flex items-center gap-1">
+                        <span>Camera</span>
+                        {isCameraDisabled && (
+                          <span className="text-[10px] text-slate-500 font-normal ml-auto">(Chọn khu vực cụ thể)</span>
+                        )}
+                      </label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          disabled={isCameraDisabled}
+                          onClick={() => {
+                            if (!isCameraDisabled) setIsOpenCameraDropdown(!isOpenCameraDropdown);
+                          }}
+                          className={`w-full bg-[#181921] border border-[#2d2f3c] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none ${
+                            isCameraDisabled ? 'opacity-50 cursor-not-allowed select-none' : 'hover:border-[#00a2e8]'
+                          }`}
+                        >
+                          <span className="truncate pr-1">
+                            {(() => {
+                              if (isCameraDisabled || filterCameras.length === 0) return 'Tất cả (All)';
+                              if (filterCameras.length === availableCameras.length && availableCameras.length > 0)
+                                return `Tất cả (${availableCameras.length} Cam)`;
+                              return availableCameras
+                                .filter(c => filterCameras.includes(c.camera_id))
+                                .map(c => c.camera_name || c.camera_id)
+                                .join(', ') || 'Tất cả (All)';
+                            })()}
+                          </span>
+                          <ChevronDown size={14} className={`text-[#00a2e8] transition-transform ${isOpenCameraDropdown && !isCameraDisabled ? 'rotate-180' : ''}`} />
+                        </button>
 
-                            <AnimatePresence>
-                              {isOpenCameraDropdown && (
-                                <>
-                                  <div className="fixed inset-0 z-40" onClick={() => setIsOpenCameraDropdown(false)} />
-                                  <motion.div
-                                    initial={{ opacity: 0, y: 5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: 5 }}
-                                    className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 p-2 space-y-1"
+                        <AnimatePresence>
+                          {isOpenCameraDropdown && !isCameraDisabled && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setIsOpenCameraDropdown(false)} />
+                              <motion.div
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 5 }}
+                                className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 p-2 space-y-1"
+                              >
+                                <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setFilterCameras(availableCameras.map(c => c.camera_id))}
+                                    className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
                                   >
-                                    <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
+                                    Chọn tất cả
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setFilterCameras([])}
+                                    className="text-[10px] text-slate-400 hover:underline font-semibold"
+                                  >
+                                    Bỏ chọn
+                                  </button>
+                                </div>
+                                <div className="max-h-40 overflow-y-auto space-y-1">
+                                  {availableCameras.map((cam) => {
+                                    const camId = cam.camera_id;
+                                    const camName = cam.camera_name || camId;
+                                    const isChecked = filterCameras.includes(camId);
+                                    return (
                                       <button
+                                        key={cam.id || camId}
                                         type="button"
-                                        onClick={() => setFilterCameras(availableCameras.map(c => c.camera_id))}
-                                        className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
+                                        onClick={() => {
+                                          if (isChecked) {
+                                            setFilterCameras(filterCameras.filter(c => c !== camId));
+                                          } else {
+                                            setFilterCameras([...filterCameras, camId]);
+                                          }
+                                        }}
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-slate-200 hover:bg-[#20212a] transition cursor-pointer"
                                       >
-                                        Chọn tất cả
+                                        <span className="truncate mr-2">{camName}</span>
+                                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked
+                                          ? 'border-[#00a2e8] bg-[#00a2e8]'
+                                          : 'border-[#2d2f3c] bg-[#111218]'
+                                          }`}>
+                                          {isChecked && <Check size={10} className="text-white font-bold" />}
+                                        </div>
                                       </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setFilterCameras([])}
-                                        className="text-[10px] text-slate-400 hover:underline font-semibold"
-                                      >
-                                        Bỏ chọn
-                                      </button>
-                                    </div>
-                                    <div className="max-h-40 overflow-y-auto space-y-1">
-                                      {availableCameras.map((cam) => {
-                                        const camId = cam.camera_id;
-                                        const camName = cam.camera_name || camId;
-                                        const isChecked = filterCameras.includes(camId);
-                                        return (
-                                          <button
-                                            key={cam.id || camId}
-                                            type="button"
-                                            onClick={() => {
-                                              if (isChecked) {
-                                                setFilterCameras(filterCameras.filter(c => c !== camId));
-                                              } else {
-                                                setFilterCameras([...filterCameras, camId]);
-                                              }
-                                            }}
-                                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-slate-200 hover:bg-[#20212a] transition cursor-pointer"
-                                          >
-                                            <span className="truncate mr-2">{camName}</span>
-                                            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked
-                                              ? 'border-[#00a2e8] bg-[#00a2e8]'
-                                              : 'border-[#2d2f3c] bg-[#111218]'
-                                              }`}>
-                                              {isChecked && <Check size={10} className="text-white font-bold" />}
-                                            </div>
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </motion.div>
-                                </>
-                              )}
-                            </AnimatePresence>
-                          </>
-                        );
-                      })()}
+                                    );
+                                  })}
+                                </div>
+                              </motion.div>
+                            </>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
-                {/* 5. Phòng ban (Real Database values) */}
+                {/* 5. Nhóm nhân viên / Phòng ban (Multiselect) */}
                 <div className="space-y-1 text-left relative">
                   <label className="text-[11px] text-slate-300 font-semibold block">Phòng ban</label>
                   <div className="relative">
@@ -6115,8 +6558,17 @@ export const ReportPage = () => {
                       onClick={() => setIsOpenListDropdown(!isOpenListDropdown)}
                       className="w-full bg-[#181921] border border-[#2d2f3c] hover:border-[#00a2e8] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none"
                     >
-                      <span>{filterList === 'All' ? 'Tất Cả' : (humanGroups.find(g => g.id === filterList)?.name || filterList)}</span>
-                      <ChevronDown size={14} className="text-[#00a2e8]" />
+                      <span className="truncate pr-1">
+                        {(() => {
+                          if (filterLists.length === 0) return 'Tất Cả';
+                          if (filterLists.length === humanGroups.length) return `Tất Cả (${humanGroups.length} Phòng ban)`;
+                          return humanGroups
+                            .filter(g => filterLists.includes(g.id))
+                            .map(g => g.name)
+                            .join(', ');
+                        })()}
+                      </span>
+                      <ChevronDown size={14} className={`text-[#00a2e8] transition-transform ${isOpenListDropdown ? 'rotate-180' : ''}`} />
                     </button>
 
                     <AnimatePresence>
@@ -6127,26 +6579,50 @@ export const ReportPage = () => {
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 5 }}
-                            className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 overflow-hidden"
+                            className="absolute left-0 right-0 mt-1 bg-[#181921] border border-[#2d2f3c] rounded shadow-2xl z-50 p-2 space-y-1"
                           >
-                            <div className="max-h-40 overflow-y-auto">
-                              {[
-                                { id: 'All', name: 'Tất Cả' },
-                                ...humanGroups
-                              ].map(listOption => (
-                                <button
-                                  key={listOption.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setFilterList(listOption.id);
-                                    setIsOpenListDropdown(false);
-                                  }}
-                                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-[#20212a] ${filterList === listOption.id ? 'text-[#00a2e8] bg-[#00a2e8]/10 font-medium' : 'text-slate-300'
-                                    }`}
-                                >
-                                  {listOption.name}
-                                </button>
-                              ))}
+                            <div className="flex justify-between border-b border-[#2d2f3c]/60 pb-1.5 mb-1.5 px-1">
+                              <button
+                                type="button"
+                                onClick={() => setFilterLists(humanGroups.map(g => g.id))}
+                                className="text-[10px] text-[#00a2e8] hover:underline font-semibold"
+                              >
+                                Chọn tất cả
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFilterLists([])}
+                                className="text-[10px] text-slate-400 hover:underline font-semibold"
+                              >
+                                Bỏ chọn
+                              </button>
+                            </div>
+                            <div className="max-h-40 overflow-y-auto space-y-1">
+                              {humanGroups.map((grp) => {
+                                const isChecked = filterLists.includes(grp.id);
+                                return (
+                                  <button
+                                    key={grp.id}
+                                    type="button"
+                                    onClick={() => {
+                                      if (isChecked) {
+                                        setFilterLists(filterLists.filter(id => id !== grp.id));
+                                      } else {
+                                        setFilterLists([...filterLists, grp.id]);
+                                      }
+                                    }}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-slate-200 hover:bg-[#20212a] transition cursor-pointer"
+                                  >
+                                    <span className="truncate mr-2">{grp.name}</span>
+                                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked
+                                      ? 'border-[#00a2e8] bg-[#00a2e8]'
+                                      : 'border-[#2d2f3c] bg-[#111218]'
+                                      }`}>
+                                      {isChecked && <Check size={10} className="text-white font-bold" />}
+                                    </div>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </motion.div>
                         </>
@@ -6219,6 +6695,7 @@ export const ReportPage = () => {
                     setFilterZones([]);
                     setFilterCameras([]);
                     setFilterList('All');
+                    setFilterLists([]);
                     setFilterEventType('All');
                     setStartDate('');
                     setEndDate('');
@@ -6233,6 +6710,7 @@ export const ReportPage = () => {
                     setAppliedZones([]);
                     setAppliedCameras([]);
                     setAppliedList('All');
+                    setAppliedLists([]);
                     setAppliedEventType('All');
                     setAppliedStartDate('');
                     setAppliedEndDate('');
@@ -6252,6 +6730,7 @@ export const ReportPage = () => {
                     setAppliedZones(filterZones);
                     setAppliedCameras(filterCameras);
                     setAppliedList(filterList);
+                    setAppliedLists(filterLists);
                     setAppliedEventType(filterEventType);
                     setAppliedStartDate(startDate);
                     setAppliedEndDate(endDate);
@@ -6449,22 +6928,22 @@ export const ReportPage = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '25px', fontSize: '12px' }}>
             <tbody>
               <tr>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6', width: '20%' }}>Tìm kiếm:</td>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6', width: '20%' }}>Từ ngày:</td>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px', width: '30%' }}>{appliedStartDate || 'Không giới hạn'}</td>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6', width: '20%' }}>Từ khóa:</td>
                 <td style={{ border: '1px solid #D1D5DB', padding: '8px', width: '30%' }}>{appliedSearch || 'Tất cả'}</td>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6', width: '20%' }}>Khu vực:</td>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px', width: '30%' }}>{appliedZone === 'All' ? 'Tất cả' : appliedZone}</td>
               </tr>
               <tr>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6' }}>Danh sách:</td>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{appliedList === 'All' ? 'Tất cả' : (humanGroups.find(g => g.id === appliedList)?.name || appliedList)}</td>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6' }}>Loại sự kiện:</td>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{appliedEventType === 'All' ? 'Tất cả' : (appliedEventType === 'in' ? 'Đi vào' : 'Đi ra')}</td>
-              </tr>
-              <tr>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6' }}>Từ ngày:</td>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{appliedStartDate || 'Không giới hạn'}</td>
                 <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6' }}>Đến ngày:</td>
                 <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{appliedEndDate || 'Không giới hạn'}</td>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6' }}>Phòng ban:</td>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{appliedList === 'All' ? 'Tất cả' : (humanGroups.find(g => g.id === appliedList)?.name || appliedList)}</td>
+              </tr>
+              <tr>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6' }}>Khu vực:</td>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{appliedZone === 'All' ? 'Tất cả' : appliedZone}</td>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6' }}>Loại sự kiện:</td>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{appliedEventType === 'All' ? 'Tất cả' : (appliedEventType === 'in' ? 'Đi vào' : 'Đi ra')}</td>
               </tr>
             </tbody>
           </table>
@@ -6472,33 +6951,42 @@ export const ReportPage = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'center' }}>
             <thead>
               <tr style={{ backgroundColor: '#0078D7', color: '#ffffff', fontWeight: 'bold' }}>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '6%' }}>STT</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '14%' }}>Khu vực</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '14%' }}>Camera</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '18%' }}>Họ và tên</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '14%' }}>Mã nhân viên</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '14%' }}>Phòng ban</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '12%' }}>Thời gian</th>
-                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '8%' }}>Độ chính xác</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '5%' }}>STT</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '16%' }}>Họ tên</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '12%' }}>Mã nhân viên</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '12%' }}>Phòng ban</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '12%' }}>Khu vực</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '8%' }}>Hướng</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '12%' }}>Camera</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '13%' }}>Thời gian</th>
+                <th style={{ border: '1px solid #D1D5DB', padding: '10px', width: '10%' }}>Độ chính xác (%)</th>
               </tr>
             </thead>
             <tbody>
-              {pdfExportEvents.map((row, idx) => (
-                <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#F9FAFB' }}>
-                  <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{idx + 1}</td>
-                  <td style={{ border: '1px solid #D1D5DB', padding: '8px', textAlign: 'left' }}>
-                    {`${row.vung} (${getAreaSuffix(row)})`}
-                  </td>
-                  <td style={{ border: '1px solid #D1D5DB', padding: '8px', textAlign: 'left' }}>
-                    {row.camera_name || row.camera_id || 'Camera 01'}
-                  </td>
-                  <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: '500', textAlign: 'left' }}>{row.ten || ''}</td>
-                  <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontFamily: 'monospace' }}>{row.ma || ''}</td>
-                  <td style={{ border: '1px solid #D1D5DB', padding: '8px', textAlign: 'left' }}>{row.danhSach || ''}</td>
-                  <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontFamily: 'monospace' }}>{row.thoiGian || ''}</td>
-                  <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold' }}>{`${row.accuracy || 95}%`}</td>
-                </tr>
-              ))}
+              {pdfExportEvents.map((row, idx) => {
+                const areaSuffix = getAreaSuffix(row);
+                const huongText = areaSuffix === 'ra' ? 'Đi ra' : areaSuffix === 'vào' ? 'Đi vào' : (row.huong && row.huong.toLowerCase().includes('ra') ? 'Đi ra' : 'Đi vào');
+                const acc = row.accuracy;
+                const isValidScore = acc !== undefined && acc !== null && acc !== '' && acc !== 'Không có dữ liệu';
+                const accuracyValue = isValidScore
+                  ? (typeof acc === 'number' ? `${acc}%` : String(acc).includes('%') ? acc : `${acc}%`)
+                  : 'Không có dữ liệu';
+                return (
+                  <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#F9FAFB' }}>
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{idx + 1}</td>
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: '500', textAlign: 'left' }}>{row.ten || ''}</td>
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontFamily: 'monospace' }}>{row.ma || ''}</td>
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', textAlign: 'left' }}>{row.danhSach || ''}</td>
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', textAlign: 'left' }}>{row.vung || ''}</td>
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px' }}>{huongText}</td>
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', textAlign: 'left' }}>
+                      {resolveCameraName(row)}
+                    </td>
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontFamily: 'monospace' }}>{row.thoiGian || ''}</td>
+                    <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold' }}>{accuracyValue}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -6518,13 +7006,13 @@ export const ReportPage = () => {
       >
         <div style={{ padding: '30px', fontFamily: 'Segoe UI, Arial, sans-serif' }}>
           <h2 style={{ textAlign: 'center', color: '#0078D7', fontWeight: 'bold', fontSize: '20px', marginBottom: '25px', textTransform: 'uppercase' }}>
-            BÁO CÁO ĐIỂM DANH - {attendanceType.toUpperCase()}
+            BÁO CÁO CHẤM CÔNG - {attendanceType.toUpperCase().replace('ĐIỂM DANH', 'CHẤM CÔNG')}
           </h2>
 
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '25px', fontSize: '12px' }}>
             <tbody>
               <tr>
-                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6', width: '20%' }}>Nhóm:</td>
+                <td style={{ border: '1px solid #D1D5DB', padding: '8px', fontWeight: 'bold', backgroundColor: '#F3F4F6', width: '20%' }}>Phòng ban:</td>
                 <td style={{ border: '1px solid #D1D5DB', padding: '8px', width: '30%' }}>
                   {attendanceGroup === 'All' ? 'Tất cả' : (humanGroups.find(g => g.id === attendanceGroup)?.name || attendanceGroup)}
                 </td>
@@ -6576,6 +7064,15 @@ export const ReportPage = () => {
           </table>
         </div>
       </div>
+      {/* Floating Corner System Loading Spinner Icon (Icon only, no text) */}
+      {(isLoadingLogs || isLoadingPage || isDailyReportLoading || isRangeReportLoading || isLoadingReport || isLoadingAllMeetingsAttendance || exporting || isRefreshing) && (
+        <div
+          id="system-loading-corner-icon"
+          className="fixed bottom-6 right-6 z-50 p-3 bg-[#14151c]/90 border border-[#00a2e8]/40 rounded-full shadow-2xl backdrop-blur-md text-[#00a2e8] flex items-center justify-center pointer-events-none"
+        >
+          <Loader2 size={22} className="animate-spin text-[#00a2e8]" />
+        </div>
+      )}
     </div>
   );
 };
