@@ -337,8 +337,15 @@ export const StatisticsPage: React.FC = () => {
               return list.includes(groupName) || list.includes(chart.selectedGroup);
             });
 
-            // Default display order (no sorting by total count)
-            const sortedChartData = [...chart.data];
+            // Sort chart data by overall total across ALL active charts (descending)
+            const sortedChartData = [...chart.data].sort((a, b) => {
+              const totalA = overallEmployeeTotalMap[a.ma || a.id || a.ten] || 0;
+              const totalB = overallEmployeeTotalMap[b.ma || b.id || b.ten] || 0;
+              if (totalB !== totalA) {
+                return totalB - totalA; // Higher total across all charts appears first
+              }
+              return b.totalCount - a.totalCount;
+            });
 
             // Calculate summary metrics for current chart
             const totalIn = sortedChartData.reduce((acc, curr) => acc + curr.inCount, 0);
