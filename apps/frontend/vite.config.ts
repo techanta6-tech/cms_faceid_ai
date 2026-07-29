@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    envDir: path.resolve(__dirname, '../../'),
     base: './', // Thêm dòng này để build đúng đường dẫn assets dạng tương đối cho Electron
     plugins: [react(), tailwindcss()],
     resolve: {

@@ -6,6 +6,7 @@
     "apps/*"
   ],
   "scripts": {
+    "dev": "yarn dev:frontend && yarn dev:backend",
     "dev:frontend": "yarn workspace frontend dev",
     "dev:backend": "yarn workspace backend start:dev",
     "dev:backend:nogen": "yarn workspace backend start:dev:nogen",

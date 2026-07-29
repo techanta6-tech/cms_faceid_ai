@@ -30,7 +30,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     env_file:
-      - apps/backend/.env
+      - .env
     volumes:
       - '${HOST_IMAGE_PATH}:/app/event-images:ro'
     depends_on:
@@ -59,7 +59,7 @@ services:
       context: .
       dockerfile: apps/frontend/Dockerfile
       args:
-        - VITE_WS_URL=http://localhost:8082
+        - VITE_WS_URL=${VITE_WS_URL:-http://localhost:8082}
     image: cms_faceid-frontend:latest
     container_name: cms_faceid-frontend
     ports:
