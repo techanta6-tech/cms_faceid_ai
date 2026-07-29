@@ -79,17 +79,26 @@ export const StatisticsPage: React.FC = () => {
   const [empSearchQuery, setEmpSearchQuery] = useState<string>('');
 
   // Fetch / calculate statistics for a specific chart block
-  const fetchChartData = useCallback(async (chartId: string, chartConfig?: Partial<ChartBlock>) => {
+  const fetchChartData = useCallback(async (chartId: string, chartConfig?: ChartBlock) => {
+    // Set loading state for targeted chart
     setCharts(prev => prev.map(c => c.id === chartId ? { ...c, isLoading: true } : c));
 
-    // Find current chart config
-    const currentChart = chartConfig
-      ? { ...charts.find(c => c.id === chartId)!, ...chartConfig }
-      : charts.find(c => c.id === chartId);
-
-    if (!currentChart) return;
-
     try {
+      // Obtain latest chart config from argument or state callback
+      let currentChart: ChartBlock | undefined = chartConfig;
+      if (!currentChart) {
+        setCharts(prev => {
+          currentChart = prev.find(c => c.id === chartId);
+          return prev;
+        });
+      }
+
+      if (!currentChart) {
+        console.warn(`[fetchChartData] Chart ${chartId} not found`);
+        setCharts(prev => prev.map(c => c.id === chartId ? { ...c, isLoading: false } : c));
+        return;
+      }
+
       const baseUrl = getBackendUrl();
       // Call backend event-logs API with time bounds
       const params = new URLSearchParams({
@@ -111,6 +120,8 @@ export const StatisticsPage: React.FC = () => {
       if (res.ok) {
         const json = await res.json();
         events = json.data || [];
+      } else {
+        console.warn(`[fetchChartData] HTTP ${res.status} when fetching event logs`);
       }
 
       // Filter employees based on selected group & selected IDs
@@ -326,15 +337,8 @@ export const StatisticsPage: React.FC = () => {
               return list.includes(groupName) || list.includes(chart.selectedGroup);
             });
 
-            // Sort chart data by overall total across ALL active charts (descending)
-            const sortedChartData = [...chart.data].sort((a, b) => {
-              const totalA = overallEmployeeTotalMap[a.ma || a.id || a.ten] || 0;
-              const totalB = overallEmployeeTotalMap[b.ma || b.id || b.ten] || 0;
-              if (totalB !== totalA) {
-                return totalB - totalA; // Higher total across all charts appears first
-              }
-              return b.totalCount - a.totalCount;
-            });
+            // Default display order (no sorting by total count)
+            const sortedChartData = [...chart.data];
 
             // Calculate summary metrics for current chart
             const totalIn = sortedChartData.reduce((acc, curr) => acc + curr.inCount, 0);
@@ -416,7 +420,7 @@ export const StatisticsPage: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={() => fetchChartData(chart.id)}
+                    onClick={() => fetchChartData(chart.id, chart)}
                     disabled={chart.isLoading}
                     className="p-2 rounded-xl bg-[#1c1d26] hover:bg-[#252735] text-slate-300 hover:text-white border border-[#2d2f3c] text-xs transition cursor-pointer disabled:opacity-50"
                     title="Tải lại dữ liệu biểu đồ"
@@ -614,7 +618,7 @@ export const StatisticsPage: React.FC = () => {
                   <div className="col-span-12 lg:col-span-2">
                     <button
                       type="button"
-                      onClick={() => fetchChartData(chart.id)}
+                      onClick={() => fetchChartData(chart.id, chart)}
                       disabled={chart.isLoading}
                       className="w-full h-[38px] px-3 bg-[#00a2e8] hover:bg-[#008cc9] text-white font-bold rounded-xl text-xs transition shadow-md shadow-[#00a2e8]/20 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
