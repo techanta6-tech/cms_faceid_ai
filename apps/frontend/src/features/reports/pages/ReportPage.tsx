@@ -2668,7 +2668,7 @@ export const ReportPage = () => {
     let typeSlug = 'BaoCao';
     switch (attendanceType) {
       case 'Báo cáo theo ngày':
-        typeSlug = 'BaoCao_TongHopHangNgay';
+        typeSlug = 'baocao_chamcong';
         break;
       case 'Báo cáo theo tuần':
         typeSlug = 'BaoCao_TongHopHangTuan';
@@ -2837,8 +2837,8 @@ export const ReportPage = () => {
             if (!mainSheet[cellRef]) {
               const isMetadataCell = isDaily
                 ? ((R >= 1 && R <= 2 && C <= 7) || (R === 3 && (C === 4 || C === 5)))
-                : (R >= 1 && R <= 2 && C <= 3);
-              const isTableDetailCell = (R >= tableHeaderRowIndex && C <= (isDaily ? 7 : 4));
+                : (R >= 1 && R <= 2 && C <= 8);
+              const isTableDetailCell = (R >= tableHeaderRowIndex && C <= (isDaily ? 7 : 8));
               if (isMetadataCell || isTableDetailCell) {
                 mainSheet[cellRef] = { t: 's', v: '' };
               } else {
@@ -2853,16 +2853,72 @@ export const ReportPage = () => {
             if (R === 0) {
               cell.s.font = { name: 'Segoe UI', sz: 14, bold: true, color: { rgb: '0078D7' } };
               cell.s.alignment = { horizontal: 'center', vertical: 'center' };
-            } else if ((R >= 1 && R <= 2 && C <= 7) || (R === 3 && (C === 4 || C === 5))) {
-              const isLabel = C % 2 === 0;
-              cell.s.font = { name: 'Segoe UI', sz: 10, bold: isLabel };
+            } else if (isDaily ? ((R >= 1 && R <= 2 && C <= 7) || (R === 3 && (C === 4 || C === 5))) : (R >= 1 && R <= 2 && C <= 8)) {
+              // header info metadata rows styling
               cell.s.alignment = { horizontal: 'center', vertical: 'center' };
-              cell.s.border = {
-                top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder
-              };
-              if (isLabel) {
-                cell.s.fill = { fgColor: { rgb: 'F3F4F6' } };
+              cell.s.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+
+              let bgRgb = 'FFFFFF';
+              let textRgb = '111827';
+              let isBold = false;
+
+              if (isDaily) {
+                const isLabel = C % 2 === 0;
+                isBold = isLabel;
+                if (isLabel) {
+                  bgRgb = 'F3F4F6';
+                  textRgb = '374151';
+                }
+
+                // Custom badge coloring for isDaily summary boxes
+                if (R === 1 && (C === 4 || C === 5)) {
+                  // Đúng giờ (Green)
+                  bgRgb = 'D1FAE5'; textRgb = '065F46'; isBold = true;
+                } else if (R === 1 && (C === 6 || C === 7)) {
+                  // Vắng (Red)
+                  bgRgb = 'FEE2E2'; textRgb = '991B1B'; isBold = true;
+                } else if (R === 2 && (C === 2 || C === 3)) {
+                  // Nhân sự hiện diện (Sky)
+                  bgRgb = 'E0F2FE'; textRgb = '0369A1'; isBold = true;
+                } else if (R === 2 && (C === 4 || C === 5)) {
+                  // Vào muộn (Amber)
+                  bgRgb = 'FEF3C7'; textRgb = '92400E'; isBold = true;
+                } else if (R === 2 && (C === 6 || C === 7)) {
+                  // Về sớm (Violet)
+                  bgRgb = 'EDE9FE'; textRgb = '5B21B6'; isBold = true;
+                } else if (R === 3 && (C === 4 || C === 5)) {
+                  // Cần xử lý riêng (Orange)
+                  bgRgb = 'FFEDD5'; textRgb = 'C2410C'; isBold = true;
+                }
+              } else {
+                // !isDaily (Weekly / Monthly summary boxes)
+                const isLabel = C === 0 || C === 2 || C === 4 || C === 7;
+                isBold = isLabel;
+                if (isLabel) {
+                  bgRgb = 'F3F4F6';
+                  textRgb = '374151';
+                }
+
+                if (R === 1 && (C === 4 || C === 5)) {
+                  // Hoàn thành tốt (Green)
+                  bgRgb = 'D1FAE5'; textRgb = '065F46'; isBold = true;
+                } else if (R === 1 && (C === 7 || C === 8)) {
+                  // Đi trễ (Amber)
+                  bgRgb = 'FEF3C7'; textRgb = '92400E'; isBold = true;
+                } else if (R === 2 && (C === 2 || C === 3)) {
+                  // Số lượng nhân sự (Sky)
+                  bgRgb = 'E0F2FE'; textRgb = '0369A1'; isBold = true;
+                } else if (R === 2 && (C === 4 || C === 5)) {
+                  // Về sớm (Violet)
+                  bgRgb = 'EDE9FE'; textRgb = '5B21B6'; isBold = true;
+                } else if (R === 2 && (C === 7 || C === 8)) {
+                  // Vắng (Red)
+                  bgRgb = 'FEE2E2'; textRgb = '991B1B'; isBold = true;
+                }
               }
+
+              cell.s.font = { name: 'Segoe UI', sz: 10, bold: isBold, color: { rgb: textRgb } };
+              cell.s.fill = { fgColor: { rgb: bgRgb } };
             } else if (R === tableHeaderRowIndex) {
               cell.s.font = { name: 'Segoe UI', sz: 10, bold: true, color: { rgb: 'FFFFFF' } };
               cell.s.fill = { fgColor: { rgb: '0078D7' } };
@@ -2875,18 +2931,41 @@ export const ReportPage = () => {
               cell.s.border = {
                 top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder
               };
+              // Color coding for Tốt/Trễ/Sớm/Vắng columns (only for weekly/monthly)
+              if (!isDaily) {
+                // Columns: STT=0, MaNV=1, HoTen=2, PhongBan=3, TongGio=4, Tot=5, Tre=6, Som=7, Vang=8
+                const cellVal = mainSheet[cellRef]?.v;
+                const numVal = typeof cellVal === 'number' ? cellVal : parseInt(String(cellVal ?? ''));
+                if (C === 5 && !isNaN(numVal)) {
+                  // Hoàn thành tốt → xanh lá
+                  if (numVal > 0) cell.s.fill = { fgColor: { rgb: 'D1FAE5' } }; // green-100
+                  cell.s.font = { name: 'Segoe UI', sz: 10, bold: numVal > 0, color: { rgb: numVal > 0 ? '065F46' : '6B7280' } };
+                } else if (C === 6 && !isNaN(numVal)) {
+                  // Đi trễ → vàng cam
+                  if (numVal > 0) cell.s.fill = { fgColor: { rgb: 'FEF3C7' } }; // amber-100
+                  cell.s.font = { name: 'Segoe UI', sz: 10, bold: numVal > 0, color: { rgb: numVal > 0 ? '92400E' : '6B7280' } };
+                } else if (C === 7 && !isNaN(numVal)) {
+                  // Về sớm → tím nhạt
+                  if (numVal > 0) cell.s.fill = { fgColor: { rgb: 'EDE9FE' } }; // violet-100
+                  cell.s.font = { name: 'Segoe UI', sz: 10, bold: numVal > 0, color: { rgb: numVal > 0 ? '5B21B6' : '6B7280' } };
+                } else if (C === 8 && !isNaN(numVal)) {
+                  // Vắng → đỏ nhạt
+                  if (numVal > 0) cell.s.fill = { fgColor: { rgb: 'FEE2E2' } }; // red-100
+                  cell.s.font = { name: 'Segoe UI', sz: 10, bold: numVal > 0, color: { rgb: numVal > 0 ? '991B1B' : '6B7280' } };
+                }
+              }
             }
           }
         }
 
         mainSheet['!merges'] = [
-          { s: { r: 0, c: 0 }, e: { r: 0, c: isDaily ? 7 : 4 } },
+          { s: { r: 0, c: 0 }, e: { r: 0, c: isDaily ? 7 : 8 } },
         ];
 
         mainSheet['!autofilter'] = {
           ref: XLSX.utils.encode_range({
             s: { r: tableHeaderRowIndex, c: 0 },
-            e: { r: range.e.r, c: isDaily ? 7 : 4 }
+            e: { r: range.e.r, c: isDaily ? 7 : 8 }
           })
         };
 
@@ -4535,7 +4614,7 @@ export const ReportPage = () => {
 
                         return (
                           <div className="text-[11px] font-mono text-slate-400">
-                            Phát hiện: <span className="text-white font-bold font-mono">{activeCount}</span> nhân sự
+                            Nhân sự: <span className="text-white font-bold font-mono">{activeCount}</span>
                           </div>
                         );
                       })()}
@@ -4551,92 +4630,92 @@ export const ReportPage = () => {
                                 <>
                                   <thead>
                                     <tr className="bg-[#15161f] border-b border-[#21232d] text-[10px] font-bold text-slate-400 tracking-wider uppercase">
-                                       <th onClick={() => handleAttSort('stt')} className="py-3 px-4 text-center w-12 cursor-pointer hover:text-white select-none">
-                                         <div className="flex items-center justify-center space-x-1">
-                                           <span>STT</span>
-                                           {attSortKey === 'stt' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                         </div>
-                                       </th>
-                                       <th onClick={() => handleAttSort('ma')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
-                                         <div className="flex items-center justify-center space-x-1">
-                                           <span>Mã NV</span>
-                                           {attSortKey === 'ma' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                         </div>
-                                       </th>
-                                       <th onClick={() => handleAttSort('ten')} className="py-3 px-4 text-left cursor-pointer hover:text-white select-none">
-                                         <div className="flex items-center justify-start space-x-1">
-                                           <span>Họ và Tên</span>
-                                           {attSortKey === 'ten' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                         </div>
-                                       </th>
-                                       <th onClick={() => handleAttSort('danhSach')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
-                                         <div className="flex items-center justify-center space-x-1">
-                                           <span>Phòng ban</span>
-                                           {attSortKey === 'danhSach' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                         </div>
-                                       </th>
-                                       {!isWeeklyOrMonthly && (
-                                         <th onClick={() => handleAttSort('thoiGianVao')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
-                                           <div className="flex items-center justify-center space-x-1">
-                                             <span>Giờ Vào</span>
-                                             {attSortKey === 'thoiGianVao' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                           </div>
-                                         </th>
-                                       )}
-                                       {!isWeeklyOrMonthly && (
-                                         <th onClick={() => handleAttSort('thoiGianRa')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
-                                           <div className="flex items-center justify-center space-x-1">
-                                             <span>Giờ Ra</span>
-                                             {attSortKey === 'thoiGianRa' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                           </div>
-                                         </th>
-                                       )}
-                                       <th onClick={() => handleAttSort('totalHours')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
-                                         <div className="flex items-center justify-center space-x-1">
-                                           <span>Tổng giờ</span>
-                                           {attSortKey === 'totalHours' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                         </div>
-                                       </th>
-                                       {isWeeklyOrMonthly && (
-                                         <th onClick={() => handleAttSort('good')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
-                                           <div className="flex items-center justify-center space-x-1">
-                                             <span>Hoàn thành tốt</span>
-                                             {attSortKey === 'good' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                           </div>
-                                         </th>
-                                       )}
-                                       {isWeeklyOrMonthly && (
-                                         <th onClick={() => handleAttSort('late')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
-                                           <div className="flex items-center justify-center space-x-1">
-                                             <span>Đi trễ</span>
-                                             {attSortKey === 'late' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                           </div>
-                                         </th>
-                                       )}
-                                       {isWeeklyOrMonthly && (
-                                         <th onClick={() => handleAttSort('early')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
-                                           <div className="flex items-center justify-center space-x-1">
-                                             <span>Về sớm</span>
-                                             {attSortKey === 'early' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                           </div>
-                                         </th>
-                                       )}
-                                       {isWeeklyOrMonthly && (
-                                         <th onClick={() => handleAttSort('absent')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
-                                           <div className="flex items-center justify-center space-x-1">
-                                             <span>Vắng</span>
-                                             {attSortKey === 'absent' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                           </div>
-                                         </th>
-                                       )}
-                                       {!isWeeklyOrMonthly && (
-                                         <th onClick={() => handleAttSort('status')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
-                                           <div className="flex items-center justify-center space-x-1">
-                                             <span>Trạng thái</span>
-                                             {attSortKey === 'status' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
-                                           </div>
-                                         </th>
-                                       )}
+                                      <th onClick={() => handleAttSort('stt')} className="py-3 px-4 text-center w-12 cursor-pointer hover:text-white select-none">
+                                        <div className="flex items-center justify-center space-x-1">
+                                          <span>STT</span>
+                                          {attSortKey === 'stt' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                        </div>
+                                      </th>
+                                      <th onClick={() => handleAttSort('ma')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                        <div className="flex items-center justify-center space-x-1">
+                                          <span>Mã NV</span>
+                                          {attSortKey === 'ma' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                        </div>
+                                      </th>
+                                      <th onClick={() => handleAttSort('ten')} className="py-3 px-4 text-left cursor-pointer hover:text-white select-none">
+                                        <div className="flex items-center justify-start space-x-1">
+                                          <span>Họ và Tên</span>
+                                          {attSortKey === 'ten' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                        </div>
+                                      </th>
+                                      <th onClick={() => handleAttSort('danhSach')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                        <div className="flex items-center justify-center space-x-1">
+                                          <span>Phòng ban</span>
+                                          {attSortKey === 'danhSach' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                        </div>
+                                      </th>
+                                      {!isWeeklyOrMonthly && (
+                                        <th onClick={() => handleAttSort('thoiGianVao')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                          <div className="flex items-center justify-center space-x-1">
+                                            <span>Giờ Vào</span>
+                                            {attSortKey === 'thoiGianVao' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                          </div>
+                                        </th>
+                                      )}
+                                      {!isWeeklyOrMonthly && (
+                                        <th onClick={() => handleAttSort('thoiGianRa')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                          <div className="flex items-center justify-center space-x-1">
+                                            <span>Giờ Ra</span>
+                                            {attSortKey === 'thoiGianRa' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                          </div>
+                                        </th>
+                                      )}
+                                      <th onClick={() => handleAttSort('totalHours')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                        <div className="flex items-center justify-center space-x-1">
+                                          <span>Tổng giờ</span>
+                                          {attSortKey === 'totalHours' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                        </div>
+                                      </th>
+                                      {isWeeklyOrMonthly && (
+                                        <th onClick={() => handleAttSort('good')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                          <div className="flex items-center justify-center space-x-1">
+                                            <span>Hoàn thành tốt</span>
+                                            {attSortKey === 'good' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                          </div>
+                                        </th>
+                                      )}
+                                      {isWeeklyOrMonthly && (
+                                        <th onClick={() => handleAttSort('late')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                          <div className="flex items-center justify-center space-x-1">
+                                            <span>Đi trễ</span>
+                                            {attSortKey === 'late' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                          </div>
+                                        </th>
+                                      )}
+                                      {isWeeklyOrMonthly && (
+                                        <th onClick={() => handleAttSort('early')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                          <div className="flex items-center justify-center space-x-1">
+                                            <span>Về sớm</span>
+                                            {attSortKey === 'early' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                          </div>
+                                        </th>
+                                      )}
+                                      {isWeeklyOrMonthly && (
+                                        <th onClick={() => handleAttSort('absent')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                          <div className="flex items-center justify-center space-x-1">
+                                            <span>Vắng</span>
+                                            {attSortKey === 'absent' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                          </div>
+                                        </th>
+                                      )}
+                                      {!isWeeklyOrMonthly && (
+                                        <th onClick={() => handleAttSort('status')} className="py-3 px-4 text-center cursor-pointer hover:text-white select-none">
+                                          <div className="flex items-center justify-center space-x-1">
+                                            <span>Trạng thái</span>
+                                            {attSortKey === 'status' ? (attSortDir === 'asc' ? <ArrowUp size={11} className="text-[#00a2e8]" /> : <ArrowDown size={11} className="text-[#00a2e8]" />) : <ArrowUpDown size={11} className="text-slate-600 opacity-40 hover:opacity-100" />}
+                                          </div>
+                                        </th>
+                                      )}
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-[#1b1c24] text-xs font-mono">
@@ -4661,12 +4740,12 @@ export const ReportPage = () => {
                                             }`}
                                         >
                                           <td className="py-2.5 px-4 text-center text-slate-500 font-semibold">{stt}</td>
-                                          <td className="py-2.5 px-4 text-slate-400 font-normal">{emp.ma}</td>
+                                          <td className="py-2.5 px-4 text-center text-slate-400 font-normal">{emp.ma}</td>
                                           <td className={`py-2.5 px-4 font-sans font-medium ${(isSelected && !isWeeklyOrMonthly) ? 'text-[#00a2e8]' : 'text-slate-100'}`}>{emp.ten}</td>
-                                          <td className="py-2.5 px-4 font-sans">{emp.danhSach}</td>
-                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianVao && emp.thoiGianVao !== 'Trống' && emp.thoiGianVao !== 'Không có dữ liệu' ? formatTimeOnly(emp.thoiGianVao) : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
-                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-emerald-400 font-semibold">{emp.thoiGianRa && emp.thoiGianRa !== 'Trống' && emp.thoiGianRa !== 'Không có dữ liệu' ? formatTimeOnly(emp.thoiGianRa) : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
-                                          <td className="py-2.5 px-4 text-white font-bold">{emp.totalHours || '0 h'}</td>
+                                          <td className="py-2.5 px-4 text-center font-sans">{emp.danhSach}</td>
+                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-center text-emerald-400 font-semibold">{emp.thoiGianVao && emp.thoiGianVao !== 'Trống' && emp.thoiGianVao !== 'Không có dữ liệu' ? formatTimeOnly(emp.thoiGianVao) : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
+                                          {!isWeeklyOrMonthly && <td className="py-2.5 px-4 text-center text-emerald-400 font-semibold">{emp.thoiGianRa && emp.thoiGianRa !== 'Trống' && emp.thoiGianRa !== 'Không có dữ liệu' ? formatTimeOnly(emp.thoiGianRa) : <span className="text-slate-600">Không có dữ liệu</span>}</td>}
+                                          <td className="py-2.5 px-4 text-center text-white font-bold">{emp.totalHours || '0 h'}</td>
                                           {isWeeklyOrMonthly && <td className="py-2.5 px-4 text-center text-emerald-400 font-bold">{rangeStats.good}</td>}
                                           {isWeeklyOrMonthly && <td className="py-2.5 px-4 text-center text-amber-400 font-bold">{rangeStats.late}</td>}
                                           {isWeeklyOrMonthly && <td className="py-2.5 px-4 text-center text-amber-400 font-bold">{rangeStats.early}</td>}
@@ -4696,14 +4775,14 @@ export const ReportPage = () => {
                                   <thead>
                                     <tr className="bg-[#15161f] border-b border-[#21232d] text-[10px] font-bold text-slate-400 tracking-wider uppercase">
                                       <th className="py-3 px-4 text-center w-12">STT</th>
-                                      <th className="py-3 px-4">Mã NV</th>
+                                      <th className="py-3 px-4 text-center">Mã NV</th>
                                       <th className="py-3 px-4">Họ và Tên</th>
-                                      <th className="py-3 px-4">Nhóm / nhóm nhân viên</th>
-                                      <th className="py-3 px-4">Ngày</th>
-                                      <th className="py-3 px-4">Giờ Vào Thực Tế</th>
-                                      <th className="py-3 px-4">Đi muộn</th>
-                                      <th className="py-3 px-4">Về Sớm</th>
-                                      <th className="py-3 px-4">Lý do</th>
+                                      <th className="py-3 px-4 text-center">Nhóm / nhóm nhân viên</th>
+                                      <th className="py-3 px-4 text-center">Ngày</th>
+                                      <th className="py-3 px-4 text-center">Giờ Vào Thực Tế</th>
+                                      <th className="py-3 px-4 text-center">Đi muộn</th>
+                                      <th className="py-3 px-4 text-center">Về Sớm</th>
+                                      <th className="py-3 px-4 text-center">Lý do</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-[#1b1c24] text-xs font-mono">
@@ -4719,14 +4798,14 @@ export const ReportPage = () => {
                                             }`}
                                         >
                                           <td className="py-2.5 px-4 text-center text-slate-500 font-semibold">{idx + 1}</td>
-                                          <td className="py-2.5 px-4 text-amber-500 font-bold">{emp.ma}</td>
+                                          <td className="py-2.5 px-4 text-center text-amber-500 font-bold">{emp.ma}</td>
                                           <td className={`py-2.5 px-4 font-sans font-medium ${isSelected ? 'text-[#00a2e8]' : 'text-slate-100'}`}>{emp.ten}</td>
-                                          <td className="py-2.5 px-4 font-sans">{emp.danhSach}</td>
-                                          <td className="py-2.5 px-4 text-slate-400">09/07/2026</td>
-                                          <td className="py-2.5 px-4 text-rose-400 font-bold">08:15:32</td>
-                                          <td className="py-2.5 px-4 text-rose-400 font-bold">15 phút</td>
-                                          <td className="py-2.5 px-4 text-slate-400">0 phút</td>
-                                          <td className="py-2.5 px-4 font-sans">Kẹt xe</td>
+                                          <td className="py-2.5 px-4 text-center font-sans">{emp.danhSach}</td>
+                                          <td className="py-2.5 px-4 text-center text-slate-400">09/07/2026</td>
+                                          <td className="py-2.5 px-4 text-center text-rose-400 font-bold">08:15:32</td>
+                                          <td className="py-2.5 px-4 text-center text-rose-400 font-bold">15 phút</td>
+                                          <td className="py-2.5 px-4 text-center text-slate-400">0 phút</td>
+                                          <td className="py-2.5 px-4 text-center font-sans">Kẹt xe</td>
                                         </tr>
                                       );
                                     })}
@@ -4739,9 +4818,9 @@ export const ReportPage = () => {
                                   <thead>
                                     <tr className="bg-[#15161f] border-b border-[#21232d] text-[10px] font-bold text-slate-400 tracking-wider uppercase">
                                       <th className="py-3 px-4 text-center w-12">STT</th>
-                                      <th className="py-3 px-4">Mã NV</th>
+                                      <th className="py-3 px-4 text-center">Mã NV</th>
                                       <th className="py-3 px-4">Họ và Tên</th>
-                                      <th className="py-3 px-4">Nhóm / nhóm nhân viên</th>
+                                      <th className="py-3 px-4 text-center">Nhóm / nhóm nhân viên</th>
                                       <th className="py-3 px-4 text-center">Nghỉ phép</th>
                                       <th className="py-3 px-4 text-center">Không phép</th>
                                       <th className="py-3 px-4 text-center">Nghỉ lễ</th>
@@ -4761,9 +4840,9 @@ export const ReportPage = () => {
                                             }`}
                                         >
                                           <td className="py-2.5 px-4 text-center text-slate-500 font-semibold">{idx + 1}</td>
-                                          <td className="py-2.5 px-4 text-amber-500 font-bold">{emp.ma}</td>
+                                          <td className="py-2.5 px-4 text-center text-amber-500 font-bold">{emp.ma}</td>
                                           <td className={`py-2.5 px-4 font-sans font-medium ${isSelected ? 'text-[#00a2e8]' : 'text-slate-100'}`}>{emp.ten}</td>
-                                          <td className="py-2.5 px-4 font-sans">{emp.danhSach}</td>
+                                          <td className="py-2.5 px-4 text-center font-sans">{emp.danhSach}</td>
                                           <td className="py-2.5 px-4 text-center text-emerald-400">1.0</td>
                                           <td className="py-2.5 px-4 text-center text-slate-400">0.0</td>
                                           <td className="py-2.5 px-4 text-center text-slate-400">0.0</td>
@@ -4785,10 +4864,10 @@ export const ReportPage = () => {
                                   <thead>
                                     <tr className="bg-[#15161f] border-b border-[#21232d] text-[10px] font-bold text-slate-400 tracking-wider uppercase">
                                       <th className="py-3 px-4 text-center w-12">STT</th>
-                                      <th className="py-3 px-4">Mã NV</th>
+                                      <th className="py-3 px-4 text-center">Mã NV</th>
                                       <th className="py-3 px-4">Họ và Tên</th>
-                                      <th className="py-3 px-4">Nhóm / nhóm nhân viên</th>
-                                      <th className="py-3 px-4">Ngày</th>
+                                      <th className="py-3 px-4 text-center">Nhóm / nhóm nhân viên</th>
+                                      <th className="py-3 px-4 text-center">Ngày</th>
                                       <th className="py-3 px-4 text-center">Giờ ra chuẩn</th>
                                       <th className="py-3 px-4 text-center">Giờ ra thực tế</th>
                                       <th className="py-3 px-4 text-center">Số giờ OT</th>
@@ -4809,10 +4888,10 @@ export const ReportPage = () => {
                                             }`}
                                         >
                                           <td className="py-2.5 px-4 text-center text-slate-500 font-semibold">{idx + 1}</td>
-                                          <td className="py-2.5 px-4 text-amber-500 font-bold">{emp.ma}</td>
+                                          <td className="py-2.5 px-4 text-center text-amber-500 font-bold">{emp.ma}</td>
                                           <td className={`py-2.5 px-4 font-sans font-medium ${isSelected ? 'text-[#00a2e8]' : 'text-slate-100'}`}>{emp.ten}</td>
-                                          <td className="py-2.5 px-4 font-sans">{emp.danhSach}</td>
-                                          <td className="py-2.5 px-4 text-slate-400">09/07/2026</td>
+                                          <td className="py-2.5 px-4 text-center font-sans">{emp.danhSach}</td>
+                                          <td className="py-2.5 px-4 text-center text-slate-400">09/07/2026</td>
                                           <td className="py-2.5 px-4 text-center text-slate-500">17:30:00</td>
                                           <td className="py-2.5 px-4 text-center text-amber-400 font-bold">{isPhuc ? '19:30:15' : '18:45:00'}</td>
                                           <td className="py-2.5 px-4 text-center text-emerald-400 font-bold">{isPhuc ? '2.0' : '1.25'} h</td>
@@ -5385,8 +5464,8 @@ export const ReportPage = () => {
                                 <thead>
                                   <tr className="bg-[#111218] border-b border-[#2d2f3c] text-[10px] text-slate-400 font-bold uppercase tracking-wider select-none">
                                     <th className="py-2.5 px-3 text-center">STT</th>
-                                    <th className="py-2.5 px-3">Tên cuộc họp</th>
-                                    <th className="py-2.5 px-3">Ngày</th>
+                                    <th className="py-2.5 px-3 text-left">Tên cuộc họp</th>
+                                    <th className="py-2.5 px-3 text-center">Ngày</th>
                                     <th className="py-2.5 px-3 text-center">Thời gian họp</th>
                                     <th className="py-2.5 px-3 text-center">Vào</th>
                                     <th className="py-2.5 px-3 text-center">Ra</th>
@@ -5568,8 +5647,8 @@ export const ReportPage = () => {
                                 <tr className="bg-[#111218] border-b border-[#2d2f3c] text-[10px] text-slate-400 font-bold uppercase tracking-wider select-none">
                                   {isEmpMultiSelectMode && <th className="py-3 px-4 w-8"></th>}
                                   <th className="py-3 px-4 text-center">STT</th>
-                                  <th className="py-3 px-4">Mã NV</th>
-                                  <th className="py-3 px-4">Họ và tên</th>
+                                  <th className="py-3 px-4 text-center">Mã NV</th>
+                                  <th className="py-3 px-4 text-left">Họ và tên</th>
                                   <th className="py-3 px-4 text-center">Số cuộc họp yêu cầu</th>
                                   <th className="py-3 px-4 text-center">Đúng giờ</th>
                                   <th className="py-3 px-4 text-center">Đi muộn</th>
@@ -6467,9 +6546,8 @@ export const ReportPage = () => {
                           onClick={() => {
                             if (!isCameraDisabled) setIsOpenCameraDropdown(!isOpenCameraDropdown);
                           }}
-                          className={`w-full bg-[#181921] border border-[#2d2f3c] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none ${
-                            isCameraDisabled ? 'opacity-50 cursor-not-allowed select-none' : 'hover:border-[#00a2e8]'
-                          }`}
+                          className={`w-full bg-[#181921] border border-[#2d2f3c] rounded px-3 py-2 text-xs text-white text-left flex items-center justify-between transition focus:outline-none ${isCameraDisabled ? 'opacity-50 cursor-not-allowed select-none' : 'hover:border-[#00a2e8]'
+                            }`}
                         >
                           <span className="truncate pr-1">
                             {(() => {
