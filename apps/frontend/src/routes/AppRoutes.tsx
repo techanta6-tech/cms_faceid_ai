@@ -7,6 +7,7 @@ import { AreasPage } from '../features/areas/pages/AreasPage';
 import { DevicesPage } from '../features/devices/pages/DevicesPage';
 import { EmployeesPage } from '../features/employees/pages/EmployeesPage';
 import { AccessSchedulePage } from '../features/schedule/pages/AccessSchedulePage';
+import { StatisticsPage } from '../features/statistics/pages/StatisticsPage';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -15,6 +16,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="/" element={<Navigate to="/reports" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/reports" element={<ReportPage />} />
+        <Route path="/statistics" element={<StatisticsPage />} />
         <Route path="/areas" element={<AreasPage />} />
         <Route path="/devices" element={<DevicesPage />} />
         <Route path="/employees" element={<EmployeesPage />} />
