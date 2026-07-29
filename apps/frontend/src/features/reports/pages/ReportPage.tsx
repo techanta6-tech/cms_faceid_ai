@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, FormEvent } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   List,
   TrendingUp,
@@ -8,6 +8,7 @@ import {
   Camera,
   FolderOpen,
   Settings,
+  BarChart3,
   Star,
   FileText,
   Layers,
@@ -282,6 +283,7 @@ const handleDownloadEventImages = async (event: any) => {
 
 export const ReportPage = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { eventLogs, meetings, areasData, employees, isLoadingLogs, humanGroups } = useApp();
   const [flashActive, setFlashActive] = useState(false);
 
@@ -3275,6 +3277,16 @@ export const ReportPage = () => {
             >
               <Clock size={14} />
               <span>Báo cáo cuộc họp</span>
+            </button>
+
+            {/* Tab 4: Thống kê biểu đồ (Chỉ hiện Icon, không hiện text) */}
+            <button
+              id="tab-btn-statistics"
+              onClick={() => navigate('/statistics')}
+              title="Biểu đồ thống kê số bản ghi ra/vào"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center justify-center transition-all duration-200 text-slate-400 hover:text-[#00a2e8] hover:bg-[#252735] cursor-pointer"
+            >
+              <BarChart3 size={15} />
             </button>
           </div>
         </div>

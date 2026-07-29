@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../../context/AppContext';
 import { getBackendUrl } from '../../../utils/config';
 import {
@@ -19,7 +20,8 @@ import {
   Search,
   Sparkles,
   Info,
-  SlidersHorizontal
+  SlidersHorizontal,
+  List
 } from 'lucide-react';
 
 interface EmployeeStatItem {
@@ -47,6 +49,7 @@ interface ChartBlock {
 }
 
 export const StatisticsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { employees, humanGroups } = useApp();
 
   // Helper to format today's date in YYYY-MM-DD
@@ -219,10 +222,61 @@ export const StatisticsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0e0f14] text-slate-100 overflow-y-auto p-6 space-y-6">
+    <div className="flex-1 flex flex-col overflow-hidden relative bg-[#0e0f14]">
 
-      {/* Top Page Header Banner */}
-      <div className="bg-[#14151b] border border-[#21232d] p-5 rounded-2xl shadow-2xl flex items-center justify-between">
+      {/* Header Tab Navigator */}
+      <div id="tabs-bar" className="h-14 bg-[#181921] border-b border-[#252731] flex items-center justify-between px-4 shrink-0">
+        <div className="flex items-center space-x-4">
+          <div className="text-xs text-slate-400 font-semibold tracking-wider">Thống Kê Sự Kiện</div>
+
+          {/* Sliding Big Pill Segmented Control Container */}
+          <div className="flex bg-[#111218] p-1 rounded-full border border-[#2d2f3c] space-x-1">
+            {/* Tab 1: Danh sách sự kiện */}
+            <button
+              id="tab-btn-list"
+              onClick={() => navigate('/reports')}
+              className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all duration-200 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <List size={14} />
+              <span>Danh sách sự kiện</span>
+            </button>
+
+            {/* Tab 2: Báo cáo chấm công */}
+            <button
+              id="tab-btn-attendance"
+              onClick={() => navigate('/reports')}
+              className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all duration-200 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <Calendar size={14} />
+              <span>Báo cáo chấm công</span>
+            </button>
+
+            {/* Tab 3: Báo cáo cuộc họp */}
+            <button
+              id="tab-btn-meeting"
+              onClick={() => navigate('/reports')}
+              className="px-4 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all duration-200 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <Clock size={14} />
+              <span>Báo cáo cuộc họp</span>
+            </button>
+
+            {/* Tab 4: Thống kê biểu đồ (Active - Only Icon, no text) */}
+            <button
+              id="tab-btn-statistics"
+              title="Biểu đồ thống kê số bản ghi ra/vào"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center justify-center transition-all duration-200 bg-[#0078d7] text-white shadow-lg shadow-[#0078d7]/20 cursor-pointer"
+            >
+              <BarChart3 size={15} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-y-auto p-6 space-y-6">
+
+        {/* Top Page Header Banner */}
+        <div className="bg-[#14151b] border border-[#21232d] p-5 rounded-2xl shadow-2xl flex items-center justify-between">
         <div className="flex items-center space-x-3.5">
           <div className="p-3 bg-[#00a2e8]/10 text-[#00a2e8] border border-[#00a2e8]/20 rounded-xl shadow-inner">
             <BarChart3 size={24} className="animate-pulse" />
@@ -252,27 +306,47 @@ export const StatisticsPage: React.FC = () => {
 
       {/* List of Chart Cards */}
       <div className="space-y-8">
-        {charts.map((chart, chartIndex) => {
-          // Get employees list available for selected group
-          const availableEmployees = employees.filter(e => {
-            if (!chart.selectedGroup || chart.selectedGroup === 'All') return true;
-            const groupObj = humanGroups.find(g => g.id === chart.selectedGroup);
-            const groupName = groupObj?.name || chart.selectedGroup;
-            const list = Array.isArray(e.human_group) ? e.human_group : [e.human_group];
-            return list.includes(groupName) || list.includes(chart.selectedGroup);
+        {(() => {
+          // Calculate combined total (In + Out) per employee across ALL active charts
+          const overallEmployeeTotalMap: Record<string, number> = {};
+          charts.forEach(c => {
+            c.data.forEach(item => {
+              const key = item.ma || item.id || item.ten;
+              overallEmployeeTotalMap[key] = (overallEmployeeTotalMap[key] || 0) + item.totalCount;
+            });
           });
 
-          // Calculate summary metrics for current chart
-          const totalIn = chart.data.reduce((acc, curr) => acc + curr.inCount, 0);
-          const totalOut = chart.data.reduce((acc, curr) => acc + curr.outCount, 0);
-          const grandTotal = totalIn + totalOut;
-          const maxVal = Math.max(1, ...chart.data.map(d => Math.max(d.inCount, d.outCount)));
+          return charts.map((chart, chartIndex) => {
+            // Get employees list available for selected group
+            const availableEmployees = employees.filter(e => {
+              if (!chart.selectedGroup || chart.selectedGroup === 'All') return true;
+              const groupObj = humanGroups.find(g => g.id === chart.selectedGroup);
+              const groupName = groupObj?.name || chart.selectedGroup;
+              const list = Array.isArray(e.human_group) ? e.human_group : [e.human_group];
+              return list.includes(groupName) || list.includes(chart.selectedGroup);
+            });
 
-          return (
-            <div
-              key={chart.id}
-              className="bg-[#14151b] border border-[#21232d] rounded-2xl p-6 shadow-2xl space-y-6 relative group/card"
-            >
+            // Sort chart data by overall total across ALL active charts (descending)
+            const sortedChartData = [...chart.data].sort((a, b) => {
+              const totalA = overallEmployeeTotalMap[a.ma || a.id || a.ten] || 0;
+              const totalB = overallEmployeeTotalMap[b.ma || b.id || b.ten] || 0;
+              if (totalB !== totalA) {
+                return totalB - totalA; // Higher total across all charts appears first
+              }
+              return b.totalCount - a.totalCount;
+            });
+
+            // Calculate summary metrics for current chart
+            const totalIn = sortedChartData.reduce((acc, curr) => acc + curr.inCount, 0);
+            const totalOut = sortedChartData.reduce((acc, curr) => acc + curr.outCount, 0);
+            const grandTotal = totalIn + totalOut;
+            const maxVal = Math.max(1, ...sortedChartData.map(d => Math.max(d.inCount, d.outCount)));
+
+            return (
+              <div
+                key={chart.id}
+                className="bg-[#14151b] border border-[#21232d] rounded-2xl p-6 shadow-2xl space-y-6 relative group/card"
+              >
               {/* Card Header & Title */}
               <div className="flex items-center justify-between border-b border-[#21232d] pb-4">
                 <div className="flex items-center space-x-3">
@@ -377,7 +451,7 @@ export const StatisticsPage: React.FC = () => {
                           type="time"
                           value={chart.startTime}
                           onChange={(e) => handleUpdateChartConfig(chart.id, { startTime: e.target.value })}
-                          className="bg-transparent text-xs text-white focus:outline-none w-14 font-mono [color-scheme:dark]"
+                          className="bg-transparent text-xs text-white focus:outline-none w-18 font-mono [color-scheme:dark]"
                         />
                         <input
                           type="date"
@@ -394,7 +468,7 @@ export const StatisticsPage: React.FC = () => {
                           type="time"
                           value={chart.endTime}
                           onChange={(e) => handleUpdateChartConfig(chart.id, { endTime: e.target.value })}
-                          className="bg-transparent text-xs text-white focus:outline-none w-14 font-mono [color-scheme:dark]"
+                          className="bg-transparent text-right text-xs text-white focus:outline-none w-18 font-mono [color-scheme:dark]"
                         />
                         <input
                           type="date"
@@ -612,7 +686,7 @@ export const StatisticsPage: React.FC = () => {
               </div> */}
 
               {/* DOUBLE BAR CHART CONTAINER */}
-              <div className="bg-[#101117] border border-[#21232d] rounded-2xl p-6 relative min-h-[360px] flex flex-col justify-between overflow-x-auto">
+              <div className="bg-[#101117] border border-[#21232d] rounded-2xl p-6 relative min-h-[360px] flex flex-col justify-between overflow-hidden">
                 {chart.isLoading ? (
                   <div className="flex-1 flex flex-col items-center justify-center space-y-3 py-16">
                     <RefreshCw size={28} className="animate-spin text-[#00a2e8]" />
@@ -625,123 +699,127 @@ export const StatisticsPage: React.FC = () => {
                     <p className="text-[11px] text-slate-600">Thử mở rộng khoảng thời gian hoặc thay đổi nhóm nhân viên.</p>
                   </div>
                 ) : (
-                  <div className="w-full flex-1 flex flex-col justify-end space-y-4 pt-8">
+                  <div className="w-full overflow-x-auto pt-14 pb-2">
+                    <div className="min-w-full w-max flex flex-col justify-end space-y-4">
 
-                    {/* Y-Axis Grid Lines Background */}
-                    <div className="relative w-full h-[260px] flex items-end border-b border-l border-[#2d2f3c] pl-10 pr-4">
+                      {/* Y-Axis Grid Lines Background & Plot Area */}
+                      <div className="relative w-full h-[280px] flex items-end border-b border-l border-[#2d2f3c] pl-10 pr-4 pt-14">
 
-                      {/* Y-Axis Guidelines & Ticks */}
-                      <div className="absolute left-0 top-0 bottom-0 w-8 flex flex-col justify-between text-[10px] font-mono text-slate-500 text-right pr-1 pointer-events-none">
-                        <span>{maxVal}</span>
-                        <span>{Math.round(maxVal * 0.75)}</span>
-                        <span>{Math.round(maxVal * 0.5)}</span>
-                        <span>{Math.round(maxVal * 0.25)}</span>
-                        <span>0</span>
-                      </div>
-
-                      {/* Horizontal Gridlines */}
-                      <div className="absolute left-9 right-0 top-0 bottom-0 flex flex-col justify-between pointer-events-none">
-                        <div className="border-b border-[#21232d]/60 w-full" />
-                        <div className="border-b border-[#21232d]/40 w-full" />
-                        <div className="border-b border-[#21232d]/40 w-full" />
-                        <div className="border-b border-[#21232d]/40 w-full" />
-                        <div className="border-b border-[#2d2f3c] w-full" />
-                      </div>
-
-                      {/* Bars Plot Area */}
-                      <div className="w-full h-full flex items-end justify-around space-x-4 relative z-10 pt-6">
-                        {chart.data.map((item) => {
-                          const inHeightPct = maxVal > 0 ? (item.inCount / maxVal) * 100 : 0;
-                          const outHeightPct = maxVal > 0 ? (item.outCount / maxVal) * 100 : 0;
-
-                          return (
-                            <div key={item.id} className="flex-1 max-w-[90px] flex flex-col items-center h-full justify-end group/bar relative">
-
-                              {/* Hover Tooltip Popup */}
-                              <div className="absolute bottom-full mb-2 hidden group-hover/bar:flex flex-col bg-[#1c1d27] border border-[#2d2f3c] p-2.5 rounded-xl shadow-2xl z-30 w-44 text-left pointer-events-none">
-                                <span className="font-bold text-xs text-white truncate">{item.ten}</span>
-                                <span className="text-[10px] text-slate-400 font-mono">{item.ma}</span>
-                                <div className="border-t border-[#2d2f3c] my-1.5 pt-1.5 text-[11px] space-y-1">
-                                  <div className="flex justify-between text-emerald-400 font-semibold">
-                                    <span>Đi vào:</span>
-                                    <span>{item.inCount} lượt</span>
-                                  </div>
-                                  <div className="flex justify-between text-[#00a2e8] font-semibold">
-                                    <span>Đi ra:</span>
-                                    <span>{item.outCount} lượt</span>
-                                  </div>
-                                  <div className="flex justify-between text-slate-200 font-bold border-t border-[#2d2f3c]/60 pt-1">
-                                    <span>Tổng cộng:</span>
-                                    <span>{item.totalCount} lượt</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* DUAL BARS GROUP */}
-                              <div className="w-full flex items-end justify-center space-x-1.5 h-full">
-
-                                {/* BAR 1: Đi vào (Green) */}
-                                <div className="flex-1 flex flex-col items-center justify-end h-full">
-                                  {item.inCount > 0 && (
-                                    <span className="text-[9px] font-mono font-bold text-emerald-400 mb-1 animate-pulse">
-                                      {item.inCount}
-                                    </span>
-                                  )}
-                                  <div
-                                    style={{ height: `${Math.max(inHeightPct > 0 ? inHeightPct : 2, 0)}%` }}
-                                    className={`w-full rounded-t-md transition-all duration-500 ${item.inCount > 0
-                                      ? 'bg-gradient-to-t from-emerald-600 to-emerald-400 shadow-md shadow-emerald-500/20 hover:brightness-125'
-                                      : 'bg-slate-800/40 border-t border-slate-700/50'
-                                      }`}
-                                  />
-                                </div>
-
-                                {/* BAR 2: Đi ra (Blue) */}
-                                <div className="flex-1 flex flex-col items-center justify-end h-full">
-                                  {item.outCount > 0 && (
-                                    <span className="text-[9px] font-mono font-bold text-[#00a2e8] mb-1 animate-pulse">
-                                      {item.outCount}
-                                    </span>
-                                  )}
-                                  <div
-                                    style={{ height: `${Math.max(outHeightPct > 0 ? outHeightPct : 2, 0)}%` }}
-                                    className={`w-full rounded-t-md transition-all duration-500 ${item.outCount > 0
-                                      ? 'bg-gradient-to-t from-[#0284c7] to-[#00a2e8] shadow-md shadow-[#00a2e8]/20 hover:brightness-125'
-                                      : 'bg-slate-800/40 border-t border-slate-700/50'
-                                      }`}
-                                  />
-                                </div>
-
-                              </div>
-
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                    </div>
-
-                    {/* X-Axis Employee Names Labels */}
-                    <div className="flex items-start justify-around space-x-4 pl-10 pr-4 pt-2 border-t border-[#2d2f3c]/60">
-                      {chart.data.map((item) => (
-                        <div key={`label-${item.id}`} className="flex-1 max-w-[90px] text-center">
-                          <span className="text-[11px] font-bold text-slate-200 block truncate group-hover:text-[#00a2e8] transition" title={item.ten}>
-                            {item.ten}
-                          </span>
-                          <span className="text-[9px] font-mono text-slate-500 block truncate">
-                            {item.ma}
-                          </span>
+                        {/* Y-Axis Guidelines & Ticks */}
+                        <div className="absolute left-0 top-0 bottom-0 w-8 flex flex-col justify-between text-[10px] font-mono text-slate-500 text-right pr-1 pointer-events-none">
+                          <span>{maxVal}</span>
+                          <span>{Math.round(maxVal * 0.75)}</span>
+                          <span>{Math.round(maxVal * 0.5)}</span>
+                          <span>{Math.round(maxVal * 0.25)}</span>
+                          <span>0</span>
                         </div>
-                      ))}
-                    </div>
 
+                        {/* Horizontal Gridlines */}
+                        <div className="absolute left-9 right-0 top-0 bottom-0 flex flex-col justify-between pointer-events-none">
+                          <div className="border-b border-[#21232d]/60 w-full" />
+                          <div className="border-b border-[#21232d]/40 w-full" />
+                          <div className="border-b border-[#21232d]/40 w-full" />
+                          <div className="border-b border-[#21232d]/40 w-full" />
+                          <div className="border-b border-[#2d2f3c] w-full" />
+                        </div>
+
+                        {/* Bars Plot Area */}
+                        <div className="w-full h-full flex items-end justify-around space-x-6 relative z-10 pt-4">
+                          {sortedChartData.map((item) => {
+                            const inHeightPct = maxVal > 0 ? (item.inCount / maxVal) * 100 : 0;
+                            const outHeightPct = maxVal > 0 ? (item.outCount / maxVal) * 100 : 0;
+
+                            return (
+                              <div key={item.id} className="w-20 min-w-[70px] flex flex-col items-center h-full justify-end group/bar relative hover:z-50 shrink-0">
+
+                                {/* Hover Tooltip Popup (Centered & High Z-Index) */}
+                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover/bar:flex flex-col bg-[#1c1d27] border border-[#2d2f3c] p-2.5 rounded-xl shadow-2xl z-50 w-44 text-left pointer-events-none">
+                                  <span className="font-bold text-xs text-white truncate">{item.ten}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">{item.ma}</span>
+                                  <div className="border-t border-[#2d2f3c] my-1.5 pt-1.5 text-[11px] space-y-1">
+                                    <div className="flex justify-between text-emerald-400 font-semibold">
+                                      <span>Đi vào:</span>
+                                      <span>{item.inCount} lượt</span>
+                                    </div>
+                                    <div className="flex justify-between text-[#00a2e8] font-semibold">
+                                      <span>Đi ra:</span>
+                                      <span>{item.outCount} lượt</span>
+                                    </div>
+                                    <div className="flex justify-between text-slate-200 font-bold border-t border-[#2d2f3c]/60 pt-1">
+                                      <span>Tổng cộng:</span>
+                                      <span>{item.totalCount} lượt</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* DUAL BARS GROUP */}
+                                <div className="w-full flex items-end justify-center space-x-1.5 h-full">
+
+                                  {/* BAR 1: Đi vào (Green) */}
+                                  <div className="flex-1 flex flex-col items-center justify-end h-full">
+                                    {item.inCount > 0 && (
+                                      <span className="text-[9px] font-mono font-bold text-emerald-400 mb-1 animate-pulse">
+                                        {item.inCount}
+                                      </span>
+                                    )}
+                                    <div
+                                      style={{ height: `${Math.max(inHeightPct > 0 ? inHeightPct : 2, 0)}%` }}
+                                      className={`w-full rounded-t-md transition-all duration-500 ${item.inCount > 0
+                                        ? 'bg-gradient-to-t from-emerald-600 to-emerald-400 shadow-md shadow-emerald-500/20 hover:brightness-125'
+                                        : 'bg-slate-800/40 border-t border-slate-700/50'
+                                        }`}
+                                    />
+                                  </div>
+
+                                  {/* BAR 2: Đi ra (Blue) */}
+                                  <div className="flex-1 flex flex-col items-center justify-end h-full">
+                                    {item.outCount > 0 && (
+                                      <span className="text-[9px] font-mono font-bold text-[#00a2e8] mb-1 animate-pulse">
+                                        {item.outCount}
+                                      </span>
+                                    )}
+                                    <div
+                                      style={{ height: `${Math.max(outHeightPct > 0 ? outHeightPct : 2, 0)}%` }}
+                                      className={`w-full rounded-t-md transition-all duration-500 ${item.outCount > 0
+                                        ? 'bg-gradient-to-t from-[#0284c7] to-[#00a2e8] shadow-md shadow-[#00a2e8]/20 hover:brightness-125'
+                                        : 'bg-slate-800/40 border-t border-slate-700/50'
+                                        }`}
+                                    />
+                                  </div>
+
+                                </div>
+
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                      </div>
+
+                      {/* X-Axis Employee Names Labels */}
+                      <div className="flex items-start justify-around space-x-6 pl-10 pr-4 pt-2 border-t border-[#2d2f3c]/60">
+                        {sortedChartData.map((item) => (
+                          <div key={`label-${item.id}`} className="w-20 min-w-[70px] text-center shrink-0">
+                            <span className="text-[11px] font-bold text-slate-200 block truncate group-hover:text-[#00a2e8] transition" title={item.ten}>
+                              {item.ten}
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-500 block truncate" title={item.ma}>
+                              {item.ma}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                    </div>
                   </div>
                 )}
               </div>
 
             </div>
           );
-        })}
+        });
+      })()}
+        </div>
       </div>
 
     </div>
