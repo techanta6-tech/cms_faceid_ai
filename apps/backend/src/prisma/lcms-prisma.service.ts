@@ -14,6 +14,11 @@ export class LcmsPrismaService extends PrismaClient implements OnModuleInit {
   }
 
   async onModuleInit() {
-    await this.$connect();
+    try {
+      await this.$connect();
+      console.log('[LcmsPrismaService] Connected to LCMS Database successfully');
+    } catch (error: any) {
+      console.error('[LcmsPrismaService] Failed to connect to LCMS Database:', error?.message || error);
+    }
   }
 }

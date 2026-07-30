@@ -14,6 +14,11 @@ export class DvmsPrismaService extends PrismaClient implements OnModuleInit {
   }
 
   async onModuleInit() {
-    await this.$connect();
+    try {
+      await this.$connect();
+      console.log('[DvmsPrismaService] Connected to DVMS Database successfully');
+    } catch (error: any) {
+      console.error('[DvmsPrismaService] Failed to connect to DVMS Database:', error?.message || error);
+    }
   }
 }

@@ -28,7 +28,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     console.log(`Connecting to WebSocket Server at: ${wsUrl}`);
 
     const socketInstance = io(wsUrl, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
     });
 

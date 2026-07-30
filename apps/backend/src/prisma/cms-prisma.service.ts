@@ -14,6 +14,11 @@ export class CmsPrismaService extends PrismaClient implements OnModuleInit {
   }
 
   async onModuleInit() {
-    await this.$connect();
+    try {
+      await this.$connect();
+      console.log('[CmsPrismaService] Connected to CMS Database successfully');
+    } catch (error: any) {
+      console.error('[CmsPrismaService] Failed to connect to CMS Database:', error?.message || error);
+    }
   }
 }
