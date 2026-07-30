@@ -6,7 +6,7 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "yarn dev:frontend && yarn dev:backend",
+    "dev": "concurrently \"yarn dev:frontend\" \"yarn dev:backend\"",
     "dev:frontend": "yarn workspace frontend dev",
     "dev:backend": "yarn workspace backend start:dev",
     "dev:backend:nogen": "yarn workspace backend start:dev:nogen",
@@ -15,5 +15,8 @@
     "prisma:studio:lcms": "yarn workspace backend prisma:studio:lcms",
     "prisma:studio:dvms": "yarn workspace backend prisma:studio:dvms",
     "prisma:studio:cms": "yarn workspace backend prisma:studio:cms"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.4"
   }
 }
