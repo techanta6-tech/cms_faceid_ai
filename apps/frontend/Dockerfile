@@ -1,6 +1,8 @@
 # --- Build stage ---
 FROM node:20-alpine AS builder
 
+RUN apk add --no-cache p7zip squashfs-tools gcompat
+
 WORKDIR /app
 
 # Copy root configs
@@ -20,14 +22,17 @@ COPY apps/frontend ./apps/frontend
 ARG VITE_WS_URL
 ENV VITE_WS_URL=$VITE_WS_URL
 
-# Build frontend
-RUN yarn workspace frontend build
+# Build frontend web & Electron desktop app
+RUN yarn workspace frontend electron:build
 
 # --- Serve stage using Nginx ---
 FROM nginx:alpine
 
-# Copy built files
+# Copy built web files
 COPY --from=builder /app/apps/frontend/dist /usr/share/nginx/html
+
+# Copy built Electron installer files
+COPY --from=builder /app/apps/release/dist-electron /app/dist-electron
 
 # Copy Nginx config for frontend on port 3035
 COPY apps/frontend/nginx.conf /etc/nginx/conf.d/default.conf
