@@ -2,6 +2,13 @@
   "name": "frontend",
   "private": true,
   "version": "0.0.1",
+
+   "description": "CMS FaceID AI frontend and desktop shell",
+  "homepage": "https://github.com/techanta6-tech/cms_faceid_ai",
+  "author": {
+    "name": "CMS FaceID",
+    "email": "support@cmsfaceid.local"
+  },
   "type": "module",
   "main": "main.cjs",
   "scripts": {
@@ -66,11 +73,11 @@
     "win": {
       "target": [
         "nsis"
-      ]
+       ],
+      "signAndEditExecutable": false
     },
     "linux": {
       "target": [
-        "deb",
         "AppImage"
       ]
     }

@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 RUN apk add --no-cache openssl
 
@@ -21,7 +21,7 @@ COPY apps/backend ./apps/backend
 RUN yarn workspace backend build
 
 # --- Production runner image ---
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 RUN apk add --no-cache openssl
 
